@@ -1,0 +1,60 @@
+-- Copyright © 2012 Bart Massey
+
+-- For further documentation, see http://haskell.org/cabal/users-guide/
+
+-- The name of the package.
+name:                minecraft-level
+
+-- The package version.  See the Haskell package versioning policy (PVP) 
+-- for standards guiding when and how versions should be incremented.
+-- http://www.haskell.org/haskellwiki/Package_versioning_policy
+-- PVP summary:      +-+------- breaking API changes
+--                   | | +----- non-breaking API additions
+--                   | | | +--- code changes with no API change
+version:             0.1.0.0
+
+-- A short (one-line) description of the package.
+synopsis:            On-disk level data processing routines for Minecraft
+
+-- A longer description of the package.
+-- description:         
+
+-- URL for the project homepage or repository.
+homepage:            http://github.com/BartMassey/minecraft-level
+
+-- The license under which the package is released.
+license:             BSD3
+
+-- The file containing the license text.
+license-file:        COPYING
+
+-- The package author(s).
+author:              Bart Massey
+
+-- An email address to which users can send suggestions, bug reports, and 
+-- patches.
+maintainer:          <bart.massey@gmail.com>
+
+-- A copyright notice.
+-- copyright:           
+
+category:            Game
+
+build-type:          Simple
+
+-- Constraint on the version of Cabal needed to build this package.
+cabal-version:       >=1.8
+
+
+library
+  -- Modules exported by the library.
+  exposed-modules:     Game.Minecraft.Level
+  
+  -- Modules included in this library but not exported.
+  -- other-modules:       
+  
+  -- Other library packages from which modules are imported.
+  build-depends:       base ==4.5.*, zlib ==0.5.*,
+                       bytestring ==0.9.*, nbt ==0.4.*,
+                       cereal ==0.3.*, filepath ==1.3.*,
+                       utf8-string ==0.3.*, array ==0.4.*
