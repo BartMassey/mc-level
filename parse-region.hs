@@ -24,8 +24,8 @@ data ChunkIndex = ChunkIndex {
   ciTimeStamp :: Word32
 } deriving Show
 
-parseNBT :: String -> IO [ChunkIndex]
-parseNBT fn = do
+parseRegionFile :: String -> IO [ChunkIndex]
+parseRegionFile fn = do
   regionFile <- BS.readFile fn
   let regions = eitherErr $ runGet parseHeader regionFile
   return regions
