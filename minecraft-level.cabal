@@ -47,6 +47,8 @@ cabal-version:       >=1.8
 
 
 library
+  ghc-options: -Wall -O2
+
   -- Modules exported by the library.
   exposed-modules:     Game.Minecraft.Level
   
@@ -54,7 +56,9 @@ library
   -- other-modules:       
   
   -- Other library packages from which modules are imported.
-  build-depends:       base ==4.5.*, zlib ==0.5.*,
-                       bytestring ==0.9.*, nbt ==0.4.*,
-                       cereal ==0.3.*, filepath ==1.3.*,
-                       utf8-string ==0.3.*, array ==0.4.*
+
+  build-depends:       base ==4.5.*, containers == 0.5.*,
+                       zlib ==0.5.*, bytestring ==0.9.*,
+                       nbt ==0.4.*, cereal ==0.3.*,
+                       filepath ==1.3.*, utf8-string ==0.3.*,
+                       array ==0.4.*
