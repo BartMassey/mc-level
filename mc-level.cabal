@@ -3,7 +3,7 @@
 -- For further documentation, see http://haskell.org/cabal/users-guide/
 
 -- The name of the package.
-name:                minecraft-level
+name:                mc-level
 
 -- The package version.  See the Haskell package versioning policy (PVP) 
 -- for standards guiding when and how versions should be incremented.
@@ -20,7 +20,7 @@ synopsis:            On-disk level data processing routines for Minecraft
 -- description:         
 
 -- URL for the project homepage or repository.
-homepage:            http://github.com/BartMassey/minecraft-level
+homepage:            http://github.com/BartMassey/mc-level
 
 -- The license under which the package is released.
 license:             BSD3
@@ -45,7 +45,6 @@ build-type:          Simple
 -- Constraint on the version of Cabal needed to build this package.
 cabal-version:       >=1.8
 
-
 library
   ghc-options: -Wall -O2
 
@@ -62,3 +61,16 @@ library
                        nbt ==0.4.*, cereal ==0.3.*,
                        filepath ==1.3.*, utf8-string ==0.3.*,
                        array ==0.4.*
+
+executable mc-read-world
+
+  main-is:        mc-read-world.hs
+
+  ghc-options:    -Wall -O2
+
+  build-depends:  base ==4.5.*, containers == 0.5.*,
+                  zlib ==0.5.*, bytestring ==0.9.*,
+                  nbt ==0.4.*, cereal ==0.3.*,
+                  filepath ==1.3.*, utf8-string ==0.3.*,
+                  array ==0.4.*, mc-level
+

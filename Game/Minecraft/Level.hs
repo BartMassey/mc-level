@@ -97,8 +97,8 @@ uncoord (x, z) seqnum =
 -- 'ByteString' and the offset of the start of the region in
 -- chunk coordinates @(x, z)@, return a list of the valid
 -- chunk index entries of the region file.
-decodeRegionIndex :: BS.ByteString -> (Int, Int) -> [ChunkIndex]
-decodeRegionIndex regionFile regionPos =
+decodeRegionIndex :: (Int, Int) -> BS.ByteString -> [ChunkIndex]
+decodeRegionIndex regionPos regionFile =
   eitherErr $ runGet parseHeader regionFile
   where
     parseHeader = do
