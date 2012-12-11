@@ -46,8 +46,7 @@ nbtToXml (StringTag name _ value) =
 nbtToXml (ListTag name tagtype count values) =
   let countAttr = makeAttr "count" (show count) in
   let typeAttr = makeAttr "type" (typeName tagtype) in
-  let es = map (Elem . nbtToXml) values in
-  makeTag "list" name [countAttr, typeAttr] es
+  makeTag "list" name [countAttr, typeAttr] $ makeListContent values
 nbtToXml (CompoundTag name values) =
   makeTag "compound" name [] $ map (Elem . nbtToXml) values
 nbtToXml (IntArrayTag name count values) =
@@ -86,3 +85,10 @@ genericFloat :: RealFloat a => a -> String
 genericFloat v 
   | abs v > 0.0000001 && abs v <1000000.0 = showFFloat Nothing v ""
   | otherwise = showEFloat Nothing v ""
+
+makeListContent :: [NBT] -> [Content]
+makeListContent values =
+  zipWith mkContent [0 :: Int32 ..] values
+  where
+    mkContent i v =
+      Elem $ add_attr (makeAttr "index" (show i)) $ nbtToXml v
