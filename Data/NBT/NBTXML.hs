@@ -10,50 +10,63 @@ import Data.NBT
 import Text.XML.Light
 import Data.Array.IArray
 
+typeNames :: [(TagType, String)]
+typeNames = [
+  (ByteType, "byte"),
+  (ShortType, "short"),
+  (IntType, "int"),
+  (LongType, "long"),
+  (FloatType, "float"),
+  (DoubleType, "double"),
+  (ByteArrayType, "byte-array"),
+  (StringType, "string"),
+  (ListType, "list"),
+  (CompoundType, "compound"),
+  (IntArrayType, "int-array") ]
+
 typeName :: TagType -> String
-typeName EndType = error "illegal end tag"
-typeName ByteType = "byte"
-typeName ShortType = "short"
-typeName IntType = "int"
-typeName LongType = "long"
-typeName FloatType = "float"
-typeName DoubleType = "double"
-typeName ByteArrayType = "byte-array"
-typeName StringType = "string"
-typeName ListType = "list"
-typeName CompoundType = "compound"
-typeName IntArrayType = "int-array"
+typeName tag =
+  case lookup tag typeNames of
+    Just name -> name
+    Nothing -> error "illegal tag"
+
+nameType :: String -> TagType
+nameType name =
+  let nameTypes = map (\(a, b) -> (b, a)) typeNames in
+  case lookup name nameTypes of
+    Just tag -> tag
+    Nothing -> error $ "illegal tag name " ++ name
 
 nbtToXml :: NBT -> Element
 nbtToXml EndTag =
   error "unmatched TAG_End in NBT"
 nbtToXml (ByteTag name value) =
-  makeScalarTag "byte" name (show value)
+  makeScalarTag ByteType name (show value)
 nbtToXml (ShortTag name value) =
-  makeScalarTag "short" name (show value)
+  makeScalarTag ShortType name (show value)
 nbtToXml (IntTag name value) =
-  makeScalarTag "int" name (show value)
+  makeScalarTag IntType name (show value)
 nbtToXml (LongTag name value) =
-  makeScalarTag "long" name (show value)
+  makeScalarTag LongType name (show value)
 nbtToXml (FloatTag name value) =
-  makeScalarTag "float" name (genericFloat value)
+  makeScalarTag FloatType name (genericFloat value)
 nbtToXml (DoubleTag name value) =
-  makeScalarTag "double" name (genericFloat value)
+  makeScalarTag DoubleType name (genericFloat value)
 nbtToXml (ByteArrayTag name count values) =
-  makeArrayTag "byte-array" name count values
+  makeArrayTag ByteArrayType name count values
 nbtToXml (StringTag name _ value) =
-  makeScalarTag "string" name value
+  makeScalarTag StringType name value
 nbtToXml (ListTag name tagtype count values) =
   let countAttr = makeAttr "count" (show count) in
   let typeAttr = makeAttr "type" (typeName tagtype) in
-  makeTag "list" name [countAttr, typeAttr] $ makeListContent values
+  makeTag ListType name [countAttr, typeAttr] $ makeListContent values
 nbtToXml (CompoundTag name values) =
-  makeTag "compound" name [] $ map (Elem . nbtToXml) values
+  makeTag CompoundType name [] $ map (Elem . nbtToXml) values
 nbtToXml (IntArrayTag name count values) =
-  makeArrayTag "int-array" name count values
+  makeArrayTag IntArrayType name count values
 
 makeArrayTag :: (IArray a e, Show e) => 
-                String -> Maybe String -> Int32 -> a Int32 e -> Element
+                TagType -> Maybe String -> Int32 -> a Int32 e -> Element
 makeArrayTag tag name count values =
   let countAttr = makeAttr "count" (show count) in
   let es = map mkElem $ assocs values in
@@ -61,15 +74,15 @@ makeArrayTag tag name count values =
   where
     mkElem (i, v) =
       let indexAttr = makeAttr "index" (show i) in
-      Elem $ makeTag "byte" Nothing [indexAttr] [makeText (show v)]
+      Elem $ makeTag ByteType Nothing [indexAttr] [makeText (show v)]
 
-makeScalarTag :: String -> Maybe String -> String -> Element
+makeScalarTag :: TagType -> Maybe String -> String -> Element
 makeScalarTag tag name value =
   makeTag tag name [] [makeText value]
 
-makeTag :: String -> Maybe String -> [Attr] -> [Content] -> Element
+makeTag :: TagType -> Maybe String -> [Attr] -> [Content] -> Element
 makeTag tag Nothing attrs values = 
-  Element (unqual tag) attrs values Nothing
+  Element (unqual (typeName tag)) attrs values Nothing
 makeTag tag (Just name) attrs values =
   makeTag tag Nothing (makeAttr "name" name : attrs) values
 
