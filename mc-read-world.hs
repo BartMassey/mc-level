@@ -2,7 +2,7 @@
 -- Experimental Minecraft world reader
 
 import qualified Data.ByteString as BS
-import Data.NBT.NBTXML
+import Data.NBT.XML
 import Game.Minecraft.Level
 import System.Environment
 
