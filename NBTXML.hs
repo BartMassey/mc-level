@@ -1,6 +1,9 @@
 -- Copyright © 2012 Bart Massey
 -- Converter between Minecraft 'NBT' and 'Text.XML.Light' 'Node's.
 
+module NBTXML (module Text.XML.Light, nbtToXml)
+where
+
 import Data.Int
 import Data.NBT
 import Text.XML.Light
