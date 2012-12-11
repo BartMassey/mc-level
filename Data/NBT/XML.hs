@@ -1,6 +1,8 @@
 -- Copyright © 2012 Bart Massey
 -- Converter between Minecraft 'NBT' and 'Text.XML.Light' 'Node's.
 
+-- | This module provides services for serialization/deserialization
+-- of Minecraft 'NBT' as 'XML'.
 module Data.NBT.XML (module Text.XML.Light, nbtToXml)
 where
 
@@ -37,6 +39,7 @@ nameType name =
     Just tag -> tag
     Nothing -> error $ "illegal tag name " ++ name
 
+-- | Given an 'NBT' term, emit an 'XML' element.
 nbtToXml :: NBT -> Element
 nbtToXml EndTag =
   error "unmatched TAG_End in NBT"

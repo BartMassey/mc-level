@@ -4,7 +4,9 @@
 
 -- | This code provides an API for Minecraft
 -- <http://minecraft.net> on-disk world (aka "level") data
--- reading and writing.
+-- reading and writing. It was inspired by @acfoltzer@'s
+-- @minecraft-data@ code
+-- <http://github.com/acfoltzer/minecraft-data>.
 -- 
 -- The intent is to take or return \"decorated\" 'NBT' with
 -- minimal processing, mostly merely writing or locating and
@@ -12,8 +14,8 @@
 -- world.
 -- 
 -- A Minecraft world comprises overview data, player data,
--- and \"map\" data for the various regions of the world
--- (notably the surface, the Nether, and the End). The
+-- and \"map\" data for the various dimensions of the world
+-- (notably the Surface, the Nether, and the End). The
 -- on-disk data formats for all of this are pretty
 -- thoroughly documented on the Minecraft Wiki
 -- <http://minecraftwiki.net>.
