@@ -4,6 +4,7 @@
 module Data.NBT.NBTXML (module Text.XML.Light, nbtToXml)
 where
 
+import Numeric (showFFloat, showEFloat)
 import Data.Int
 import Data.NBT
 import Text.XML.Light
@@ -35,9 +36,9 @@ nbtToXml (IntTag name value) =
 nbtToXml (LongTag name value) =
   makeScalarTag "long" name (show value)
 nbtToXml (FloatTag name value) =
-  makeScalarTag "float" name (show value)
+  makeScalarTag "float" name (genericFloat value)
 nbtToXml (DoubleTag name value) =
-  makeScalarTag "double" name (show value)
+  makeScalarTag "double" name (genericFloat value)
 nbtToXml (ByteArrayTag name count values) =
   makeArrayTag "byte-array" name count values
 nbtToXml (StringTag name _ value) =
@@ -61,11 +62,11 @@ makeArrayTag tag name count values =
   where
     mkElem (i, v) =
       let indexAttr = makeAttr "index" (show i) in
-      Elem $ makeTag "byte" Nothing [indexAttr] [CRef (show v)]
+      Elem $ makeTag "byte" Nothing [indexAttr] [makeText (show v)]
 
 makeScalarTag :: String -> Maybe String -> String -> Element
 makeScalarTag tag name value =
-  makeTag tag name [] [CRef value]
+  makeTag tag name [] [makeText value]
 
 makeTag :: String -> Maybe String -> [Attr] -> [Content] -> Element
 makeTag tag Nothing attrs values = 
@@ -76,3 +77,12 @@ makeTag tag (Just name) attrs values =
 makeAttr :: String -> String -> Attr
 makeAttr name value =
   Attr (unqual name) value
+
+makeText :: String -> Content
+makeText s =
+  Text $ CData CDataText s Nothing
+
+genericFloat :: RealFloat a => a -> String
+genericFloat v 
+  | abs v > 0.0000001 && abs v <1000000.0 = showFFloat Nothing v ""
+  | otherwise = showEFloat Nothing v ""
