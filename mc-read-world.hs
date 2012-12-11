@@ -2,10 +2,9 @@
 -- Experimental Minecraft world reader
 
 import qualified Data.ByteString as BS
+import Data.NBT.NBTXML
 import Game.Minecraft.Level
 import System.Environment
-
-import NBTXML
 
 main :: IO ()
 main = do
