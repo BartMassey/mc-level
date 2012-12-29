@@ -1,6 +1,9 @@
 -- Copyright © 2012 Bart Massey
 -- Experimental Minecraft world reader
 
+module Main
+where
+
 import qualified Data.ByteString as BS
 import Data.NBT.XML
 import Game.Minecraft.Level

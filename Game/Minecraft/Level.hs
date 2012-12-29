@@ -24,7 +24,21 @@
 -- as used by Minecraft 1.4.4. (Backporting to earlier
 -- formats would be straightforward if there's interest.)
 
-module Game.Minecraft.Level
+module Game.Minecraft.Level (
+  Level(..),
+  Dims(..),
+  Region(..),
+  readLevel,
+  readPlayerData,
+  readDims,
+  readRegion,
+  fileToNbt,
+  nbtToFile,
+  ChunkIndex(..), 
+  ChunkData(..),
+  decodeRegionIndex,
+  encodeRegionIndex,
+  getChunk )
 where
 
 import qualified Codec.Compression.GZip as GZip
@@ -114,8 +128,8 @@ readRegion pn = do
         regionContents = nbt }
       
 
-readDimsData :: FilePath -> [FilePath] -> IO Dims
-readDimsData pn entries = do
+readDims :: FilePath -> [FilePath] -> IO Dims
+readDims pn entries = do
   surface <- getRegion "region"
   nether <- getRegion "DIM-1"
   end <- getRegion "DIM1"
@@ -139,7 +153,7 @@ readLevel pn = do
     if "players" `elem` entries
       then readPlayerData $ (pn </> "players")
       else return []
-  dims <- readDimsData pn entries
+  dims <- readDims pn entries
   return $ 
     Level {
       levelDat = dat,

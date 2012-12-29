@@ -1,4 +1,4 @@
-* Traverse world directory for automatic file discovery.
+* Populate world directory from XML.
 * Translate from XML representation.
 * Enhance XML with wrapper tags.
 * Enhance XML with human-readable IDs.
