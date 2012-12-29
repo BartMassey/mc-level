@@ -33,10 +33,15 @@ import Control.Monad
 import Data.Bits
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
+import Data.List
 import qualified Data.Map as M
+import Data.Maybe
 import Data.NBT
 import Data.Serialize
 import Data.Word
+import System.Directory
+import System.FilePath
+import Text.Regex
 
 -- | Reification of an entry in the chunk index header of a
 -- region file.
@@ -72,9 +77,78 @@ data ChunkData = ChunkData {
 eitherErr :: Either String a -> a
 eitherErr = either error id
 
+data Region = Region { 
+  regionX, regionY :: Int,
+  regionContents :: NBT }
+
+data Dims = Dims { dimsSurface, dimsNether, dimsEnd :: Maybe [Region] }
+
+data Level = Level { 
+  levelDat :: NBT,
+  levelPlayers :: [NBT],
+  levelDims :: Dims }
+
+readPlayerData :: FilePath -> IO [NBT]
+readPlayerData pn = do
+  entries <- getDirectoryContents pn
+  mapM fileToNbt $ map (pn </>) $ filter (".dat" `isSuffixOf`) entries
+
+regionFileNameRE :: Regex
+regionFileNameRE =
+  mkRegexWithOpts "r\\.\\(-?[0-9]\\)+\\.\\(-?[0-9]+\\)\\.mca" False False
+
+readRegion :: FilePath -> IO [Region]
+readRegion pn = do
+  entries <- getDirectoryContents pn
+  let regions = mapMaybe checkPath entries
+  mapM getRegion regions
+  where
+    checkPath en = do
+      [xstr, ystr] <- matchRegex regionFileNameRE en
+      return (en, xstr, ystr)
+    getRegion (en, xstr, ystr) = do
+      nbt <- fileToNbt $ pn </> en
+      return $ Region {
+        regionX = read xstr,
+        regionY = read ystr,
+        regionContents = nbt }
+      
+
+readDimsData :: FilePath -> [FilePath] -> IO Dims
+readDimsData pn entries = do
+  surface <- getRegion "region"
+  nether <- getRegion "DIM-1"
+  end <- getRegion "DIM1"
+  return $ Dims {
+    dimsSurface = surface,
+    dimsNether = nether,
+    dimsEnd = end }
+  where
+    getRegion rn =
+      if rn `elem` entries
+        then fmap Just $ readRegion $ pn </> rn
+        else return Nothing
+
+readLevel :: FilePath -> IO Level
+readLevel pn = do
+  entries <- getDirectoryContents pn
+  unless ("level.dat" `elem` entries) 
+    (error "readLevel: path does not contain a Minecraft level")
+  dat <- fileToNbt "level.dat"
+  players <- 
+    if "players" `elem` entries
+      then readPlayerData $ (pn </> "players")
+      else return []
+  dims <- readDimsData pn entries
+  return $ 
+    Level {
+      levelDat = dat,
+      levelPlayers = players,
+      levelDims = dims }
+
 -- | Given the name of a gzip-compressed 'NBT' file,
 -- return that file as 'NBT'.
-fileToNbt :: String -> IO NBT
+fileToNbt :: FilePath -> IO NBT
 fileToNbt fn = do
   nbtFile <- LBS.readFile fn
   let nbtData = GZip.decompress nbtFile
@@ -82,12 +156,11 @@ fileToNbt fn = do
 
 -- | Given the name of a gzip-compressed 'NBT' file,
 -- output the given 'NBT' as the contents of that file.
-nbtToFile :: String -> NBT -> IO ()
+nbtToFile :: FilePath -> NBT -> IO ()
 nbtToFile fn nbt = do
   let nbtFile = encodeLazy nbt
   let nbtData = GZip.compress nbtFile
   LBS.writeFile fn nbtData
-
 
 uncoord :: (Int, Int) -> Int -> (Int, Int)
 uncoord (x, z) seqnum =
