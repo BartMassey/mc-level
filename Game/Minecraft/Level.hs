@@ -302,13 +302,18 @@ levelToXml l =
 
 regionToXml :: Region -> Content
 regionToXml r =
-  let attrs = [("chunk-x", show (regionX r)), ("chunk-y", show (regionY r))] in
+  let attrs = [("x", show (regionX r)), ("y", show (regionY r))] in
   mkContent "region" attrs $ map chunkDataToXml $ regionContents r
 
 chunkDataToXml :: ChunkData -> Content
 chunkDataToXml d =
-  let attrs = [("index", show (cdChunkIndex d))] in
+  let attrs = mkAttrs $ cdChunkIndex d in
   mkContent "chunk" attrs [ Elem $ nbtToXml $ cdChunk d ]
+  where
+    mkAttrs (ChunkIndex { ciPos = (x, y), ciTimestamp = t }) = [
+      ("x", show x),
+      ("y", show y),
+      ("timestamp", show t) ]
 
 mkElement :: String -> [(String, String)] -> [Content] -> Element
 mkElement name attrs content =
