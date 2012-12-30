@@ -28,4 +28,4 @@ main = do
   let dir = getRequiredArg argv ArgIndexPath
   let short = gotArg argv ArgIndexShort
   level <- readLevel dir short
-  putStrLn $ ppElement $ levelToXml level
+  putStrLn $ ppTopElement $ levelToXml level
