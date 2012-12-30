@@ -49,7 +49,6 @@ import Control.Monad
 import Data.Bits
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
-import Data.List
 import qualified Data.Map as M
 import Data.Maybe
 import Data.NBT
@@ -101,15 +100,33 @@ data Region = Region {
 data Dims = Dims { 
   dimsSurface, dimsNether, dimsEnd :: Maybe [Region] } deriving Show
 
+data Player = Player {
+  playerName :: String,
+  playerData :: NBT } deriving Show
+
 data Level = Level { 
   levelDat :: NBT,
-  levelPlayers :: [NBT],
+  levelPlayers :: [Player],
   levelDims :: Dims } deriving Show
 
-readPlayerData :: FilePath -> IO [NBT]
+playerFileNameRE :: Regex
+playerFileNameRE =
+  mkRegexWithOpts "^(.*)\\.dat$" False True
+
+readPlayerData :: FilePath -> IO [Player]
 readPlayerData pn = do
   entries <- getDirectoryContents pn
-  mapM fileToNbt $ map (pn </>) $ filter (".dat" `isSuffixOf`) entries
+  let playernames = mapMaybe checkPath entries
+  mapM getPlayer playernames
+  where
+    checkPath en = do
+      [name] <- matchRegex playerFileNameRE en
+      return (en, name)
+    getPlayer (en, name) = do
+      nbt <- fileToNbt $ pn </> en
+      return $ Player {
+        playerName = name,
+        playerData = nbt }
 
 regionFileNameRE :: Regex
 regionFileNameRE =
@@ -286,7 +303,9 @@ levelToXml l =
                 map mkPlayer $ 
                 levelPlayers l
         where
-          mkPlayer p = mkContent "player" [] [ Elem  $ nbtToXml p ]
+          mkPlayer p =
+            let attrs = [("name", playerName p)] in
+            mkContent "player" attrs [ Elem  $ nbtToXml $ playerData p ]
       dims = catMaybes [
         mkDim "surface" dimsSurface,
         mkDim "nether" dimsNether,
