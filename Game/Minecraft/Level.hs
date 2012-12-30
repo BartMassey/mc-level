@@ -153,8 +153,8 @@ readDims pn entries = do
             else return $ Just rs
         else return Nothing
 
-readLevel :: FilePath -> IO Level
-readLevel pn = do
+readLevel :: FilePath -> Bool -> IO Level
+readLevel pn short = do
   entries <- getDirectoryContents pn
   unless ("level.dat" `elem` entries) 
     (error "readLevel: path does not contain a Minecraft level")
