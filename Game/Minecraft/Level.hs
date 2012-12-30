@@ -96,7 +96,7 @@ eitherErr = either error id
 
 data Region = Region { 
   regionX, regionY :: Int,
-  regionContents :: NBT } deriving Show
+  regionContents :: [ChunkData] } deriving Show
 
 data Dims = Dims { 
   dimsSurface, dimsNether, dimsEnd :: Maybe [Region] } deriving Show
@@ -113,7 +113,7 @@ readPlayerData pn = do
 
 regionFileNameRE :: Regex
 regionFileNameRE =
-  mkRegexWithOpts "^r\\.(-?[0-9]+)\\.(-?[0-9]+)\\.mca$" False False
+  mkRegexWithOpts "^r\\.(-?[0-9]+)\\.(-?[0-9]+)\\.mca$" False True
 
 readDim :: FilePath -> IO [Region]
 readDim pn = do
@@ -125,11 +125,13 @@ readDim pn = do
       [xstr, ystr] <- matchRegex regionFileNameRE en
       return (en, xstr, ystr)
     getRegion (en, xstr, ystr) = do
-      nbt <- fileToNbt $ pn </> en
+      let x = read xstr
+      let y = read ystr
+      cs <- readRegionFile (x, y) $ pn </> en
       return $ Region {
-        regionX = read xstr,
-        regionY = read ystr,
-        regionContents = nbt }
+        regionX = x,
+        regionY = y,
+        regionContents = cs }
       
 
 readDims :: FilePath -> [FilePath] -> IO Dims
@@ -262,6 +264,12 @@ getChunk ci regionFile =
         cdLength = Just chunkLength,
         cdChunk = nbt }
 
+readRegionFile :: (Int, Int) -> FilePath -> IO [ChunkData]
+readRegionFile (x, y) pn = do
+  regionFile <- BS.readFile pn
+  let cs = decodeRegionIndex (x, y) regionFile
+  return $ map (flip getChunk regionFile) cs
+
 levelToXml :: Level -> Element
 levelToXml l =
   let level = mkContent "level-data" [] $ [Elem (nbtToXml (levelDat l))]
@@ -286,7 +294,12 @@ levelToXml l =
 regionToXml :: Region -> Content
 regionToXml r =
   let attrs = [("chunk-x", show (regionX r)), ("chunk-y", show (regionY r))] in
-  mkContent "region" attrs [ Elem $ nbtToXml $ regionContents r ]
+  mkContent "region" attrs $ map chunkDataToXml $ regionContents r
+
+chunkDataToXml :: ChunkData -> Content
+chunkDataToXml d =
+  let attrs = [("index", show (cdChunkIndex d))] in
+  mkContent "chunk" attrs [ Elem $ nbtToXml $ cdChunk d ]
 
 mkElement :: String -> [(String, String)] -> [Content] -> Element
 mkElement name attrs content =
