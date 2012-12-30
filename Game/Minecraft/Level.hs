@@ -31,14 +31,16 @@ module Game.Minecraft.Level (
   readLevel,
   readPlayerData,
   readDims,
-  readRegion,
+  readDim,
   fileToNbt,
   nbtToFile,
   ChunkIndex(..), 
   ChunkData(..),
   decodeRegionIndex,
   encodeRegionIndex,
-  getChunk )
+  getChunk, 
+  levelToXml, 
+  regionToXml )
 where
 
 import qualified Codec.Compression.GZip as GZip
@@ -51,6 +53,7 @@ import Data.List
 import qualified Data.Map as M
 import Data.Maybe
 import Data.NBT
+import Data.NBT.XML
 import Data.Serialize
 import Data.Word
 import System.Directory
@@ -93,14 +96,15 @@ eitherErr = either error id
 
 data Region = Region { 
   regionX, regionY :: Int,
-  regionContents :: NBT }
+  regionContents :: NBT } deriving Show
 
-data Dims = Dims { dimsSurface, dimsNether, dimsEnd :: Maybe [Region] }
+data Dims = Dims { 
+  dimsSurface, dimsNether, dimsEnd :: Maybe [Region] } deriving Show
 
 data Level = Level { 
   levelDat :: NBT,
   levelPlayers :: [NBT],
-  levelDims :: Dims }
+  levelDims :: Dims } deriving Show
 
 readPlayerData :: FilePath -> IO [NBT]
 readPlayerData pn = do
@@ -109,10 +113,10 @@ readPlayerData pn = do
 
 regionFileNameRE :: Regex
 regionFileNameRE =
-  mkRegexWithOpts "r\\.\\(-?[0-9]\\)+\\.\\(-?[0-9]+\\)\\.mca" False False
+  mkRegexWithOpts "^r\\.(-?[0-9]+)\\.(-?[0-9]+)\\.mca$" False False
 
-readRegion :: FilePath -> IO [Region]
-readRegion pn = do
+readDim :: FilePath -> IO [Region]
+readDim pn = do
   entries <- getDirectoryContents pn
   let regions = mapMaybe checkPath entries
   mapM getRegion regions
@@ -130,17 +134,21 @@ readRegion pn = do
 
 readDims :: FilePath -> [FilePath] -> IO Dims
 readDims pn entries = do
-  surface <- getRegion "region"
-  nether <- getRegion "DIM-1"
-  end <- getRegion "DIM1"
+  surface <- getDim "region"
+  nether <- getDim $ "DIM-1" </> "region"
+  end <- getDim $ "DIM1" </> "region"
   return $ Dims {
     dimsSurface = surface,
     dimsNether = nether,
     dimsEnd = end }
   where
-    getRegion rn =
+    getDim rn =
       if rn `elem` entries
-        then fmap Just $ readRegion $ pn </> rn
+        then do
+          rs <- readDim $ pn </> rn
+          if null rs
+            then return Nothing
+            else return $ Just rs
         else return Nothing
 
 readLevel :: FilePath -> IO Level
@@ -148,7 +156,7 @@ readLevel pn = do
   entries <- getDirectoryContents pn
   unless ("level.dat" `elem` entries) 
     (error "readLevel: path does not contain a Minecraft level")
-  dat <- fileToNbt "level.dat"
+  dat <- fileToNbt $ pn </> "level.dat"
   players <- 
     if "players" `elem` entries
       then readPlayerData $ (pn </> "players")
@@ -253,3 +261,38 @@ getChunk ci regionFile =
         cdChunkIndex = ci,
         cdLength = Just chunkLength,
         cdChunk = nbt }
+
+levelToXml :: Level -> Element
+levelToXml l =
+  let level = mkContent "level-data" [] $ [Elem (nbtToXml (levelDat l))]
+      players = mkContent "players" [] $ 
+                map mkPlayer $ 
+                levelPlayers l
+        where
+          mkPlayer p = mkContent "player" [] [ Elem  $ nbtToXml p ]
+      dims = catMaybes [
+        mkDim "surface" dimsSurface,
+        mkDim "nether" dimsNether,
+        mkDim "end" dimsEnd ]
+        where
+          mkDim name sel =
+            fmap m $ sel $ levelDims l
+            where
+              m d = mkContent "dimension" [("name", name)] (map regionToXml d)
+  in
+  mkElement "minecraft-level" [] $  [level, players] ++ dims
+
+
+regionToXml :: Region -> Content
+regionToXml r =
+  let attrs = [("chunk-x", show (regionX r)), ("chunk-y", show (regionY r))] in
+  mkContent "region" attrs [ Elem $ nbtToXml $ regionContents r ]
+
+mkElement :: String -> [(String, String)] -> [Content] -> Element
+mkElement name attrs content =
+  let attrs' = map (\(n, v) -> Attr (unqual n) v) attrs in
+  Element (unqual name) attrs' content Nothing
+
+mkContent :: String -> [(String, String)] -> [Content] -> Content
+mkContent name attrs content =
+  Elem $ mkElement name attrs content
