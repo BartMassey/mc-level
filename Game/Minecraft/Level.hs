@@ -115,8 +115,8 @@ regionFileNameRE :: Regex
 regionFileNameRE =
   mkRegexWithOpts "^r\\.(-?[0-9]+)\\.(-?[0-9]+)\\.mca$" False True
 
-readDim :: FilePath -> IO [Region]
-readDim pn = do
+readDim :: FilePath -> Bool -> IO [Region]
+readDim pn short = do
   entries <- getDirectoryContents pn
   let regions = mapMaybe checkPath entries
   mapM getRegion regions
@@ -127,15 +127,15 @@ readDim pn = do
     getRegion (en, xstr, ystr) = do
       let x = read xstr
       let y = read ystr
-      cs <- readRegionFile (x, y) $ pn </> en
+      cs <- readRegionFile (x, y) (pn </> en) short
       return $ Region {
         regionX = x,
         regionY = y,
         regionContents = cs }
       
 
-readDims :: FilePath -> [FilePath] -> IO Dims
-readDims pn entries = do
+readDims :: FilePath -> [FilePath] -> Bool -> IO Dims
+readDims pn entries short = do
   surface <- getDim "region"
   nether <- getDim $ "DIM-1" </> "region"
   end <- getDim $ "DIM1" </> "region"
@@ -147,7 +147,7 @@ readDims pn entries = do
     getDim rn =
       if rn `elem` entries
         then do
-          rs <- readDim $ pn </> rn
+          rs <- readDim (pn </> rn) short
           if null rs
             then return Nothing
             else return $ Just rs
@@ -163,7 +163,7 @@ readLevel pn short = do
     if "players" `elem` entries
       then readPlayerData $ (pn </> "players")
       else return []
-  dims <- readDims pn entries
+  dims <- readDims pn entries short
   return $ 
     Level {
       levelDat = dat,
@@ -246,8 +246,8 @@ encodeRegionIndex regionPos chunkIndexes  =
         putTimestamp _ =
           putWord32be 0
 
-getChunk :: ChunkIndex -> BS.ByteString -> ChunkData
-getChunk ci regionFile =
+getChunk :: BS.ByteString -> Bool -> ChunkIndex -> ChunkData
+getChunk regionFile short ci =
   eitherErr $ runGet parseChunk regionFile
   where
     parseChunk = do
@@ -262,13 +262,22 @@ getChunk ci regionFile =
       return $ ChunkData {
         cdChunkIndex = ci,
         cdLength = Just chunkLength,
-        cdChunk = nbt }
+        cdChunk = if short then stripChunk nbt else nbt }
 
-readRegionFile :: (Int, Int) -> FilePath -> IO [ChunkData]
-readRegionFile (x, y) pn = do
+stripChunk :: NBT -> NBT
+stripChunk (CompoundTag (Just "") [CompoundTag (Just "Level") values]) =
+  let values' = filter notSection values in
+  CompoundTag (Just "") [CompoundTag (Just "Level") values']
+  where
+    notSection (ListTag (Just "Sections") _ _ _) = False
+    notSection _ = True
+stripChunk _ = error "bad chunk format"
+
+readRegionFile :: (Int, Int) -> FilePath -> Bool -> IO [ChunkData]
+readRegionFile (x, y) pn short = do
   regionFile <- BS.readFile pn
   let cs = decodeRegionIndex (x, y) regionFile
-  return $ map (flip getChunk regionFile) cs
+  return $ map (getChunk regionFile short) cs
 
 levelToXml :: Level -> Element
 levelToXml l =

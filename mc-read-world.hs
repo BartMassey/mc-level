@@ -14,7 +14,7 @@ argd = [
     argAbbr = Just 's',
     argName = Just "short",
     argData = Nothing,
-    argDesc = "Omit per-block data from output to save processing." },
+    argDesc = "Omit section data from chunk output to save processing." },
   Arg {
     argIndex = ArgIndexPath,
     argAbbr = Nothing,
