@@ -90,29 +90,38 @@ data ChunkData = ChunkData {
   cdLength :: Maybe Word32,
   cdChunk :: NBT } deriving Show
 
+-- | Helper function to throw an error on error return.
 eitherErr :: Either String a -> a
 eitherErr = either error id
 
+-- | Reification of a region. Coordinates are region coordinates.
 data Region = Region { 
   regionX, regionY :: Int,
   regionContents :: [ChunkData] } deriving Show
 
+-- | Reification of a dimension.
 data Dims = Dims { 
   dimsSurface, dimsNether, dimsEnd :: Maybe [Region] } deriving Show
 
+-- | Reification of a player.
 data Player = Player {
   playerName :: String,
   playerData :: NBT } deriving Show
 
+-- | Reification of a whole level.
 data Level = Level { 
   levelDat :: NBT,
   levelPlayers :: [Player],
   levelDims :: Dims } deriving Show
 
+-- | Regular expression matching a player file and locating
+-- the player name part.
 playerFileNameRE :: Regex
 playerFileNameRE =
   mkRegexWithOpts "^(.*)\\.dat$" False True
 
+-- | Given the pathname of a player directory,
+-- read all the player files in that directory.
 readPlayerData :: FilePath -> IO [Player]
 readPlayerData pn = do
   entries <- getDirectoryContents pn
@@ -128,10 +137,15 @@ readPlayerData pn = do
         playerName = name,
         playerData = nbt }
 
+-- | Regular expression matching a region file and locating the
+-- region coordinate parts.
 regionFileNameRE :: Regex
 regionFileNameRE =
   mkRegexWithOpts "^r\\.(-?[0-9]+)\\.(-?[0-9]+)\\.mca$" False True
 
+-- | Given the pathname of a dimension directory, read
+-- that dimension. If the @short@ flag is 'True', do
+-- not actually include the per-block data in the 'NBT'.
 readDim :: FilePath -> Bool -> IO [Region]
 readDim pn short = do
   entries <- getDirectoryContents pn
@@ -151,6 +165,10 @@ readDim pn short = do
         regionContents = cs }
       
 
+-- | Given the root pathname of a level directory, as well
+-- as the list of entries in that directory, read all the
+-- dimensions found. If the @short@ flag is 'True', do not
+-- actually include the per-block data in the 'NBT'.
 readDims :: FilePath -> [FilePath] -> Bool -> IO Dims
 readDims pn entries short = do
   surface <- getDim "region"
@@ -170,6 +188,9 @@ readDims pn entries short = do
             else return $ Just rs
         else return Nothing
 
+-- | Given the root pathname of a level directory, read
+-- it. If the @short@ flag is 'True', do not actually
+-- include the per-block data in the 'NBT'.
 readLevel :: FilePath -> Bool -> IO Level
 readLevel pn short = do
   entries <- getDirectoryContents pn
@@ -203,6 +224,9 @@ nbtToFile fn nbt = do
   let nbtData = GZip.compress nbtFile
   LBS.writeFile fn nbtData
 
+-- | Given the base coordinates of a region, and a linear
+-- offset within that region, return the chunk coordinates
+-- of that region.
 uncoord :: (Int, Int) -> Int -> (Int, Int)
 uncoord (x, z) seqnum =
     let x' = x + (seqnum `mod` 32) in
@@ -263,6 +287,10 @@ encodeRegionIndex regionPos chunkIndexes  =
         putTimestamp _ =
           putWord32be 0
 
+-- | Given a 'ByteString' containing a region, and a chunk
+-- index within that region, parse the chunk. If the @short@
+-- flag is 'True', do not actually include the per-block
+-- data in the 'NBT'.
 getChunk :: BS.ByteString -> Bool -> ChunkIndex -> ChunkData
 getChunk regionFile short ci =
   eitherErr $ runGet parseChunk regionFile
@@ -281,6 +309,8 @@ getChunk regionFile short ci =
         cdLength = Just chunkLength,
         cdChunk = if short then stripChunk nbt else nbt }
 
+-- | Given the 'NBT' for a chunk, strip the per-block data
+-- from that 'NBT' to save space.
 stripChunk :: NBT -> NBT
 stripChunk (CompoundTag (Just "") [CompoundTag (Just "Level") values]) =
   let values' = filter notSection values in
@@ -290,12 +320,17 @@ stripChunk (CompoundTag (Just "") [CompoundTag (Just "Level") values]) =
     notSection _ = True
 stripChunk _ = error "bad chunk format"
 
+-- | Given the region coordinates and the pathname of a
+-- region file, read the region. If the @short@ flag is
+-- 'True', do not actually include the per-block data in the
+-- 'NBT'.
 readRegionFile :: (Int, Int) -> FilePath -> Bool -> IO [ChunkData]
 readRegionFile (x, y) pn short = do
   regionFile <- BS.readFile pn
   let cs = decodeRegionIndex (x, y) regionFile
   return $ map (getChunk regionFile short) cs
 
+-- | Given a level in 'NBT' format, return an 'XML' representation.
 levelToXml :: Level -> Element
 levelToXml l =
   let level = mkContent "level-data" [] $ [Elem (nbtToXml (levelDat l))]
@@ -319,11 +354,13 @@ levelToXml l =
   mkElement "minecraft-level" [] $  [level, players] ++ dims
 
 
+-- | Given a region in 'NBT' format, return an 'XML' representation.
 regionToXml :: Region -> Content
 regionToXml r =
   let attrs = [("x", show (regionX r)), ("y", show (regionY r))] in
   mkContent "region" attrs $ map chunkDataToXml $ regionContents r
 
+-- | Given chunk data in 'NBT' format, return an 'XML' representation.
 chunkDataToXml :: ChunkData -> Content
 chunkDataToXml d =
   let attrs = mkAttrs $ cdChunkIndex d in
@@ -334,11 +371,13 @@ chunkDataToXml d =
       ("y", show y),
       ("timestamp", show t) ]
 
+-- | 'Text.XML.Light' helper function for assembling an 'Element'.
 mkElement :: String -> [(String, String)] -> [Content] -> Element
 mkElement name attrs content =
   let attrs' = map (\(n, v) -> Attr (unqual n) v) attrs in
   Element (unqual name) attrs' content Nothing
 
+-- | 'Text.XML.Light' helper function for assembling a 'Content'.
 mkContent :: String -> [(String, String)] -> [Content] -> Content
 mkContent name attrs content =
   Elem $ mkElement name attrs content

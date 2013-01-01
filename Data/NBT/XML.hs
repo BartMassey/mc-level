@@ -32,12 +32,12 @@ typeName tag =
     Just name -> name
     Nothing -> error "illegal tag"
 
-nameType :: String -> TagType
-nameType name =
-  let nameTypes = map (\(a, b) -> (b, a)) typeNames in
-  case lookup name nameTypes of
-    Just tag -> tag
-    Nothing -> error $ "illegal tag name " ++ name
+-- nameType :: String -> TagType
+-- nameType name =
+--   let nameTypes = map (\(a, b) -> (b, a)) typeNames in
+--   case lookup name nameTypes of
+--     Just tag -> tag
+--     Nothing -> error $ "illegal tag name " ++ name
 
 -- | Given an 'NBT' term, emit an 'XML' element.
 nbtToXml :: NBT -> Element

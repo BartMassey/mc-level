@@ -1,5 +1,5 @@
 -- Copyright © 2012 Bart Massey
--- Experimental Minecraft world reader
+-- Experimental Minecraft world XML encoder
 
 import Data.NBT.XML
 import Game.Minecraft.Level
