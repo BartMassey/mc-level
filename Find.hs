@@ -113,9 +113,14 @@ data Item = Item {
   itemData :: NBT }
 
 instance Show Item where
-  show (Item {itemCoords = (x, y, z), itemSource = source, itemData = nbt }) =
-    let xml = ppElement $ nbtToXml nbt in
-    printf "item[x=%d,y=%d,z=%d,source=%s]\n%s" x y z (show source) xml
+  show (Item {itemCoords = (x, y, z), itemSource = source, itemData = nbts }) =
+    printf "item=%d[x=%d,y=%d,z=%d,source=%s]" 
+      itemId x y z (show source)
+    where
+      itemId =
+        case path [Nothing, Just "id"] nbts of
+          Just (ShortTag (Just "id") i) -> i
+          _ -> error "item without id"
     
 
 tagName :: NBT -> Maybe String
@@ -137,16 +142,16 @@ contents (Just (CompoundTag _ nbts)) = Just nbts
 contents (Just (ListTag _ _ _ nbts)) = Just nbts
 contents _ = Nothing
 
-path :: [String] -> NBT -> Maybe NBT
-path [p] nbt | Just p == tagName nbt =
+path :: [Maybe String] -> NBT -> Maybe NBT
+path [p] nbt | p == tagName nbt =
   Just nbt
-path (p : ps) (CompoundTag (Just t) nbts) | p == t =
+path (p : ps) (CompoundTag t nbts) | p == t =
   tryRest ps nbts
-path (p : ps) (ListTag (Just t) _ _ nbts) | p == t =
+path (p : ps) (ListTag t _ _ nbts) | p == t =
   tryRest ps nbts
 path _ _ = Nothing
 
-tryRest :: [String] -> [NBT] -> Maybe NBT
+tryRest :: [Maybe String] -> [NBT] -> Maybe NBT
 tryRest ps nbts =
   case mapMaybe (path ps) nbts of
     [nbt] -> Just nbt
@@ -160,7 +165,9 @@ find level tree =
       concatMap findPlayer $ levelPlayers level
       where
         findPlayer player =
-          case contents $ path ["", "Inventory"] $ playerData player of
+          case contents $ 
+               path [Just "", Just "Inventory"] $ 
+               playerData player of
             Just items -> map itemize items
             _ -> error $ "player " ++ playerName player ++ " has no inventory"
           where
@@ -170,7 +177,9 @@ find level tree =
               itemData = item }
               where
                 playerCoords =
-                  case contents $ path ["", "Pos"] $ playerData player of
+                  case contents $ 
+                       path [Just "", Just "Pos"] $ 
+                       playerData player of
                     Just [ DoubleTag Nothing x, 
                            DoubleTag Nothing y, 
                            DoubleTag Nothing z ] -> 
