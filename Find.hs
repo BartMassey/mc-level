@@ -1,8 +1,11 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Find (
   Rel, ItemQualAttr(..), ItemQual(..), Find(..),
   makeTree )
 where
 
+import Text.Parsec.Prim
 import Text.ParserCombinators.Parsec
 
 type Rel = Int -> Bool
@@ -19,47 +22,33 @@ data Find = FindItem {
   findItemQuals :: [ItemQual] }
 
 parseNumber :: Parser Int
-parseNumber = do 
-  ds <- many1 digit
-  return $ read ds
+parseNumber = fmap read (many1 digit)
 
 parseId :: Parser Int
-parseId = do
-  _ <- char '='
-  parseNumber
+parseId = char '=' >> parseNumber
 
 type BRel = Int -> Int -> Bool
 
 parseRelLT :: Parser BRel
-parseRelLT = do
-  _ <- string "<"
-  return (<)
+parseRelLT = string "<" >> return (<)
 
 parseRelLE :: Parser BRel
-parseRelLE = do
-  _ <- string "<="
-  return (<=)
+parseRelLE = string "<=" >> return (<=)
 
 parseRelEQ :: Parser BRel
-parseRelEQ = do
-  _ <- string "="
-  return (==)
+parseRelEQ = string "=" >> return (==)
 
 parseRelGE :: Parser BRel
-parseRelGE = do
-  _ <- string ">="
-  return (>=)
+parseRelGE = string ">=" >> return (>=)
 
 parseRelGT :: Parser BRel
-parseRelGT = do
-  _ <- string ">"
-  return (>)
+parseRelGT = string ">" >> return (>)
 
 parseRel :: Parser Rel
 parseRel = do
   rel <- parseRelLT <|> parseRelLE <|> parseRelEQ <|> parseRelGE <|> parseRelGT
   val <- parseNumber
-  return $ \x -> x `rel` val
+  return $ (`rel` val)
 
 parseItemLevel :: Parser ItemQualAttr
 parseItemLevel = do
@@ -67,35 +56,27 @@ parseItemLevel = do
   rel <- parseRel
   return $ ItemQualLevel rel
 
-parseEnchQuals :: Parser [ItemQualAttr]
-parseEnchQuals = do
-  _ <- char '['
-  enchQuals <- sepBy1 parseItemLevel (char ',')
-  _ <- char ']'
-  return enchQuals
+parseList :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
+parseList elem = 
+  between (char '[') (char ']') (sepBy1 elem (char ','))
 
 parseItemEnch :: Parser ItemQual
 parseItemEnch = do
   _ <- string "ench"
   val <- parseId
-  quals <- option [] parseEnchQuals
+  quals <- option [] $ parseList parseItemLevel
   return $ ItemQualEnch {
     itemQualEnchId = val, 
     itemQualEnchAttrs = quals }
-
-parseItemQuals :: Parser [ItemQual]
-parseItemQuals = do
-  _ <- char '['
-  itemQuals <- sepBy1 parseItemEnch (char ',')
-  _ <- char ']'
-  return itemQuals
 
 parseItem :: Parser Find
 parseItem = do
   _ <- string "item"
   maybeItemId <- optionMaybe parseId
-  quals <- option [] parseItemQuals
-  return $ FindItem { findItemId = maybeItemId, findItemQuals = quals }
+  quals <- option [] (parseList parseItemEnch)
+  return $ FindItem { 
+    findItemId = maybeItemId, 
+    findItemQuals = quals }
 
 parseExpr :: Parser Find
 parseExpr = do
