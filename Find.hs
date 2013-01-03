@@ -2,11 +2,18 @@
 
 module Find (
   Rel, ItemQualAttr(..), ItemQual(..), Find(..),
-  makeTree )
+  makeTree, 
+  ItemSource(..), Item(..),
+  find )
 where
 
+import Data.Maybe
+import Data.NBT
+import Data.NBT.XML
+import Game.Minecraft.Level
 import Text.Parsec.Prim
 import Text.ParserCombinators.Parsec
+import Text.Printf
 
 type Rel = Int -> Bool
 
@@ -57,8 +64,8 @@ parseItemLevel = do
   return $ ItemQualLevel rel
 
 parseList :: Stream s m Char => ParsecT s u m a -> ParsecT s u m [a]
-parseList elem = 
-  between (char '[') (char ']') (sepBy1 elem (char ','))
+parseList parseElem = 
+  between (char '[') (char ']') (sepBy1 parseElem (char ','))
 
 parseItemEnch :: Parser ItemQual
 parseItemEnch = do
@@ -80,9 +87,9 @@ parseItem = do
 
 parseExpr :: Parser Find
 parseExpr = do
-  find <- parseItem
+  findExpr <- parseItem
   eof
-  return find
+  return findExpr
 
 makeTree :: String -> Find
 makeTree expr =
@@ -91,3 +98,83 @@ makeTree expr =
     Right t -> t
 
 
+data ItemSource = ItemSourcePlayer String
+                | ItemSourceTile String
+                | ItemSourceFree
+
+instance Show ItemSource where
+  show ItemSourceFree = "free"
+  show (ItemSourcePlayer name) = "player[" ++ name ++ "]"
+  show (ItemSourceTile name) = "tile[" ++ name ++ "]"
+
+data Item = Item {
+  itemCoords :: (Int, Int, Int),
+  itemSource :: ItemSource,
+  itemData :: NBT }
+
+instance Show Item where
+  show (Item {itemCoords = (x, y, z), itemSource = source, itemData = nbt }) =
+    let xml = ppElement $ nbtToXml nbt in
+    printf "item[x=%d,y=%d,z=%d,source=%s]\n%s" x y z (show source) xml
+    
+
+tagName :: NBT -> Maybe String
+tagName EndTag = Nothing
+tagName (ByteTag name _) = name
+tagName (ShortTag name _) = name
+tagName (IntTag name _) = name
+tagName (LongTag name _) = name
+tagName (FloatTag name _) = name
+tagName (DoubleTag name _) = name
+tagName (ByteArrayTag name _ _) = name
+tagName (StringTag name _ _) = name 
+tagName (ListTag name _ _ _) = name
+tagName (CompoundTag name _) = name
+tagName (IntArrayTag name _ _) = name
+
+contents :: Maybe NBT -> Maybe [NBT]
+contents (Just (CompoundTag _ nbts)) = Just nbts
+contents (Just (ListTag _ _ _ nbts)) = Just nbts
+contents _ = Nothing
+
+path :: [String] -> NBT -> Maybe NBT
+path [p] nbt | Just p == tagName nbt =
+  Just nbt
+path (p : ps) (CompoundTag (Just t) nbts) | p == t =
+  tryRest ps nbts
+path (p : ps) (ListTag (Just t) _ _ nbts) | p == t =
+  tryRest ps nbts
+path _ _ = Nothing
+
+tryRest :: [String] -> [NBT] -> Maybe NBT
+tryRest ps nbts =
+  case mapMaybe (path ps) nbts of
+    [nbt] -> Just nbt
+    _ -> Nothing
+
+find :: Level -> Find -> [Item]
+find level tree =
+  findPlayers
+  where
+    findPlayers =
+      concatMap findPlayer $ levelPlayers level
+      where
+        findPlayer player =
+          case contents $ path ["", "Inventory"] $ playerData player of
+            Just items -> map itemize items
+            _ -> error $ "player " ++ playerName player ++ " has no inventory"
+          where
+            itemize item = Item {
+              itemCoords = playerCoords,
+              itemSource = ItemSourcePlayer $ playerName player,
+              itemData = item }
+              where
+                playerCoords =
+                  case contents $ path ["", "Pos"] $ playerData player of
+                    Just [ DoubleTag Nothing x, 
+                           DoubleTag Nothing y, 
+                           DoubleTag Nothing z ] -> 
+                      (floor x, floor y, floor z)
+                    _ -> 
+                      error $  "player " ++ playerName player ++ 
+                               " has no position"

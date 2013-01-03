@@ -28,6 +28,4 @@ main = do
   let dir = getRequiredArg argv ArgIndexPath
   let tree = makeTree $ getRequiredArg argv ArgIndexExpr
   level <- readLevel dir True
-  case tree of
-    FindItem itemId _ -> print itemId
-  return ()
+  putStr $ unlines $ map show $ find level tree

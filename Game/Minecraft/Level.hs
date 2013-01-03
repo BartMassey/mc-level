@@ -26,6 +26,7 @@
 
 module Game.Minecraft.Level (
   Level(..),
+  Player(..),
   Dims(..),
   Region(..),
   readLevel,
