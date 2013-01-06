@@ -9,7 +9,6 @@ where
 
 import Data.Maybe
 import Data.NBT
-import Data.NBT.XML
 import Game.Minecraft.Level
 import Text.Parsec.Prim
 import Text.ParserCombinators.Parsec
@@ -113,34 +112,34 @@ data Item = Item {
   itemData :: NBT }
 
 instance Show Item where
-  show (Item {itemCoords = (x, y, z), itemSource = source, itemData = nbts }) =
+  show (Item {itemCoords = (x, y, z), itemSource = source, itemData = nbt }) =
     printf "item=%d[x=%d,y=%d,z=%d,source=%s]" 
       itemId x y z (show source)
     where
       itemId =
-        case path [Nothing, Just "id"] nbts of
+        case path [Nothing, Just "id"] nbt of
           Just (ShortTag (Just "id") i) -> i
           _ -> error "item without id"
-    
-
-tagName :: NBT -> Maybe String
-tagName EndTag = Nothing
-tagName (ByteTag name _) = name
-tagName (ShortTag name _) = name
-tagName (IntTag name _) = name
-tagName (LongTag name _) = name
-tagName (FloatTag name _) = name
-tagName (DoubleTag name _) = name
-tagName (ByteArrayTag name _ _) = name
-tagName (StringTag name _ _) = name 
-tagName (ListTag name _ _ _) = name
-tagName (CompoundTag name _) = name
-tagName (IntArrayTag name _ _) = name
-
-contents :: Maybe NBT -> Maybe [NBT]
-contents (Just (CompoundTag _ nbts)) = Just nbts
-contents (Just (ListTag _ _ _ nbts)) = Just nbts
-contents _ = Nothing
+{-   itemTags =
+        concat $ mapMaybe (fmap (',' :) . showTag) $ 
+          fromJust $ contents $ Just nbt
+        where
+          showTag (CompoundTag (Just "tag") nbts)
+            decodeTag nbts
+            where 
+              decodeTag nbts@(ListTag (Just "ench") CompoundType _ _) =
+                let enchId =
+                      case path [Just "ench", Just "id"] nbt of
+                        Just (ShortTag (Just "id") i) -> i
+                        _ -> error "ench without id" 
+                    enchLevel =
+                      case path [Just "ench", Just "lvl"] nbt of
+                        Just (ShortTag (Just "lvl") i) -> i
+                        _ -> error "ench without lvl"
+                in
+                Just $ printf "ench=%d[level=%d]" enchId enchLevel
+              decodeTag _ = Nothing 
+          showTag _ = Nothing -}
 
 path :: [Maybe String] -> NBT -> Maybe NBT
 path [p] nbt | p == tagName nbt =
@@ -165,10 +164,9 @@ find level tree =
       concatMap findPlayer $ levelPlayers level
       where
         findPlayer player =
-          case contents $ 
-               path [Just "", Just "Inventory"] $ 
+          case path [Just "", Just "Inventory"] $ 
                playerData player of
-            Just items -> map itemize items
+            Just (ListTag _ CompoundType _ items) -> map itemize items
             _ -> error $ "player " ++ playerName player ++ " has no inventory"
           where
             itemize item = Item {
@@ -177,12 +175,12 @@ find level tree =
               itemData = item }
               where
                 playerCoords =
-                  case contents $ 
-                       path [Just "", Just "Pos"] $ 
+                  case path [Just "", Just "Pos"] $ 
                        playerData player of
-                    Just [ DoubleTag Nothing x, 
+                    Just (ListTag _ DoubleType _ [ 
+                           DoubleTag Nothing x, 
                            DoubleTag Nothing y, 
-                           DoubleTag Nothing z ] -> 
+                           DoubleTag Nothing z ]) -> 
                       (floor x, floor y, floor z)
                     _ -> 
                       error $  "player " ++ playerName player ++ 
