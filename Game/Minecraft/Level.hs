@@ -97,7 +97,7 @@ eitherErr = either error id
 
 -- | Reification of a region. Coordinates are region coordinates.
 data Region = Region { 
-  regionX, regionY :: Int,
+  regionPos :: (Int, Int),
   regionContents :: [ChunkData] } deriving Show
 
 -- | Reification of a dimension.
@@ -158,11 +158,10 @@ readDim pn short = do
       return (en, xstr, ystr)
     getRegion (en, xstr, ystr) = do
       let x = read xstr
-      let y = read ystr
-      cs <- readRegionFile (x, y) (pn </> en) short
+      let z = read ystr
+      cs <- readRegionFile (x, z) (pn </> en) short
       return $ Region {
-        regionX = x,
-        regionY = y,
+        regionPos = (x, z),
         regionContents = cs }
       
 
@@ -239,7 +238,7 @@ uncoord (x, z) seqnum =
 -- chunk coordinates @(x, z)@, return a list of the valid
 -- chunk index entries of the region file.
 decodeRegionIndex :: (Int, Int) -> BS.ByteString -> [ChunkIndex]
-decodeRegionIndex regionPos regionFile =
+decodeRegionIndex regionP regionFile =
   eitherErr $ runGet parseHeader regionFile
   where
     parseHeader = do
@@ -251,7 +250,7 @@ decodeRegionIndex regionPos regionFile =
       where
         makeChunkIndex (seqnum, (block, ts)) =
           ChunkIndex {
-            ciPos = uncoord regionPos seqnum,
+            ciPos = uncoord regionP seqnum,
             ciFileOffset = 4096 * (block `shiftR` 8),
             ciApproxLength = 4096 * (block .&. 0xff),
             ciTimestamp = ts }
@@ -261,7 +260,7 @@ decodeRegionIndex regionPos regionFile =
 -- region file, return a strict 'ByteString' representing
 -- the header of that file.
 encodeRegionIndex :: (Int, Int) -> [ChunkIndex] -> BS.ByteString
-encodeRegionIndex regionPos chunkIndexes  =
+encodeRegionIndex regionP chunkIndexes  =
   runPut createHeader
   where
     ciMap = 
@@ -269,7 +268,7 @@ encodeRegionIndex regionPos chunkIndexes  =
       where
         mkEntry ci = (ciPos ci, ci)
     createHeader = do
-      let ps = map (uncoord regionPos) [0..1023]
+      let ps = map (uncoord regionP) [0..1023]
       mapM_ putIndex ps
       mapM_ putTimestamp ps
       where
@@ -358,7 +357,8 @@ levelToXml l =
 -- | Given a region in 'NBT' format, return an 'XML' representation.
 regionToXml :: Region -> Content
 regionToXml r =
-  let attrs = [("x", show (regionX r)), ("y", show (regionY r))] in
+  let (x, z) = regionPos r in
+  let attrs = [("x", show x), ("z", show z)] in
   mkContent "region" attrs $ map chunkDataToXml $ regionContents r
 
 -- | Given chunk data in 'NBT' format, return an 'XML' representation.
