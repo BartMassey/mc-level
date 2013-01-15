@@ -7,6 +7,7 @@ module Find (
   find )
 where
 
+import Control.Applicative (<$>, <*>)
 import Data.Maybe
 import Data.NBT
 import Game.Minecraft.Level
@@ -158,7 +159,8 @@ tryRest ps nbts =
 
 find :: Level -> Find -> [Item]
 find level tree =
-  findPlayers
+  findPlayers ++
+  findWorld
   where
     findPlayers =
       concatMap findPlayer $ levelPlayers level
@@ -185,3 +187,46 @@ find level tree =
                     _ -> 
                       error $  "player " ++ playerName player ++ 
                                " has no position"
+    findWorld =
+      let d = levelDims level in
+      let ds = [("surface", dimsSurface d), 
+                ("nether", dimsNether d), 
+                ("end", dimsEnd d)] in
+      let ws = [("free", "Entities"),
+                ("contained", "tileEntities")] in
+      concatMap findDim <$> ws <*> ds
+      where
+        findDim ((whichName, whichTag), (dimName, Just regions)) =
+          concatMap findRegion regions
+          where
+            findRegion region =
+              concatMap findChunk $ regionContents region
+              where
+                findChunk chunk =
+                  case path [Nothing, Just "Level", Just whichTag] $ 
+                       cdChunk chunk of
+                    CompoundTag (Just whichTag) nbts ->
+                      mapMaybe findItem nbts
+                      where
+                        findItem ent =
+                          case path [Just "Item"] ent of
+                            CompoundTag (Just "Item") item ->
+                              Just $ Item {
+                                itemCoords = globalCoords,
+                                itemSource = dimName ++ " " ++ whichName,
+                                itemData = item }
+                              where
+                                globalCoords =
+                                  case path [Just "Pos"] ent of
+                                    Just (ListTag _  DoubleType _ [ 
+                                             DoubleTag Nothing x, 
+                                             DoubleTag Nothing y, 
+                                             DoubleTag Nothing z ]) ->
+                                      let rx = regionX region
+                                          rz = regionZ region
+                                          rz = 
+                                      (floor x, floor y, floor z)
+                                    _ -> error $ "entity has no position"
+                            _ -> Nothing
+                    _ -> []
+        findDim _ = []
