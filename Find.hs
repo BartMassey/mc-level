@@ -7,7 +7,7 @@ module Find (
   find )
 where
 
-import Control.Applicative (<$>, <*>)
+import Control.Applicative ((<$>), (<*>))
 import Data.Maybe
 import Data.NBT
 import Game.Minecraft.Level
@@ -98,14 +98,15 @@ makeTree expr =
     Right t -> t
 
 
-data ItemSource = ItemSourcePlayer String
-                | ItemSourceTile String
-                | ItemSourceFree
+data ItemSource = ItemSourcePlayer {ispName :: String}
+                | ItemSourceTile {istDim :: String, istContainer :: String}
+                | ItemSourceFree {isfDim :: String}
 
 instance Show ItemSource where
-  show ItemSourceFree = "free"
+  show (ItemSourceFree dim) = "free[dim=" ++ dim ++ "]"
   show (ItemSourcePlayer name) = "player[" ++ name ++ "]"
-  show (ItemSourceTile name) = "tile[" ++ name ++ "]"
+  show (ItemSourceTile dim container) = "tile[dim=" ++ dim ++ ",container=" ++ 
+                                          container ++ "]"
 
 data Item = Item {
   itemCoords :: (Int, Int, Int),
@@ -192,9 +193,8 @@ find level tree =
       let ds = [("surface", dimsSurface d), 
                 ("nether", dimsNether d), 
                 ("end", dimsEnd d)] in
-      let ws = [("free", "Entities"),
-                ("contained", "tileEntities")] in
-      concatMap findDim <$> ws <*> ds
+      let ws = [("free", "Entities")] in
+      concatMap findDim $ (,) <$> ws <*> ds
       where
         findDim ((whichName, whichTag), (dimName, Just regions)) =
           concatMap findRegion regions
@@ -205,16 +205,16 @@ find level tree =
                 findChunk chunk =
                   case path [Nothing, Just "Level", Just whichTag] $ 
                        cdChunk chunk of
-                    CompoundTag (Just whichTag) nbts ->
+                    Just (CompoundTag (Just whichTag) nbts) ->
                       mapMaybe findItem nbts
                       where
                         findItem ent =
                           case path [Just "Item"] ent of
-                            CompoundTag (Just "Item") item ->
+                            Just (CompoundTag (Just "Item") item) ->
                               Just $ Item {
                                 itemCoords = globalCoords,
-                                itemSource = dimName ++ " " ++ whichName,
-                                itemData = item }
+                                itemSource = ItemSourceFree dimName,
+                                itemData = ent }
                               where
                                 globalCoords =
                                   case path [Just "Pos"] ent of
@@ -222,10 +222,15 @@ find level tree =
                                              DoubleTag Nothing x, 
                                              DoubleTag Nothing y, 
                                              DoubleTag Nothing z ]) ->
-                                      let rx = regionX region
-                                          rz = regionZ region
-                                          rz = 
-                                      (floor x, floor y, floor z)
+                                      let (rx, rz) = regionPos region in
+                                      let (cx, cz) = ciPos $ 
+                                                     cdChunkIndex chunk in
+                                      (mcc rx cx (floor x), 
+                                       floor y, 
+                                       mcc rz cz (floor z))
+                                      where
+                                        mcc r c b =
+                                          b + 16 * (c + 32 * r)
                                     _ -> error $ "entity has no position"
                             _ -> Nothing
                     _ -> []
