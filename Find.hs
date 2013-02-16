@@ -16,7 +16,7 @@ import Text.ParserCombinators.Parsec
 import Text.Printf
 
 type Rel = Int -> Bool
-
+    
 data ItemQualAttr = ItemQualLevel Rel
 
 data ItemQual = 
@@ -26,7 +26,7 @@ data ItemQual =
 
 data Find = FindItem { 
   findItemId :: Maybe Int,
-  findItemQuals :: [ItemQual] }
+  findItemQuals :: [ItemQual] } 
 
 parseNumber :: Parser Int
 parseNumber = fmap read (many1 digit)
@@ -119,9 +119,11 @@ instance Show Item where
       itemId x y z (show source)
     where
       itemId =
-        case path [Nothing, Just "id"] nbt of
+        case path [Nothing, Just "Item", Just "id"] nbt of
           Just (ShortTag (Just "id") i) -> i
-          _ -> error "item without id"
+          _ -> case path [Nothing, Just "id"] nbt of
+             Just (ShortTag (Just "id") i) -> i
+             _ -> error "item without id"
 {-   itemTags =
         concat $ mapMaybe (fmap (',' :) . showTag) $ 
           fromJust $ contents $ Just nbt
@@ -203,13 +205,13 @@ find level tree =
               concatMap findChunk $ regionContents region
               where
                 findChunk chunk =
-                  case path [Nothing, Just "Level", Just whichTag] $ 
+                  case path [Just "", Just "Level", Just whichTag] $ 
                        cdChunk chunk of
-                    Just (CompoundTag (Just whichTag) nbts) ->
+                    Just (ListTag (Just whichTag) _ _ nbts) ->
                       mapMaybe findItem nbts
                       where
                         findItem ent =
-                          case path [Just "Item"] ent of
+                          case path [Nothing, Just "Item"] ent of
                             Just (CompoundTag (Just "Item") item) ->
                               Just $ Item {
                                 itemCoords = globalCoords,
@@ -217,7 +219,7 @@ find level tree =
                                 itemData = ent }
                               where
                                 globalCoords =
-                                  case path [Just "Pos"] ent of
+                                  case path [Nothing, Just "Pos"] ent of
                                     Just (ListTag _  DoubleType _ [ 
                                              DoubleTag Nothing x, 
                                              DoubleTag Nothing y, 
