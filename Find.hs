@@ -111,19 +111,20 @@ instance Show ItemSource where
 data Item = Item {
   itemCoords :: (Int, Int, Int),
   itemSource :: ItemSource,
-  itemData :: NBT }
+  itemData   :: NBT,
+  itemId     :: Int}
 
-instance Show Item where
-  show (Item {itemCoords = (x, y, z), itemSource = source, itemData = nbt }) =
-    printf "item=%d[x=%d,y=%d,z=%d,source=%s]" 
-      itemId x y z (show source)
-    where
-      itemId =
-        case path [Nothing, Just "Item", Just "id"] nbt of
-          Just (ShortTag (Just "id") i) -> i
+extractItemId nbt =
+    case path [Nothing, Just "Item", Just "id"] nbt of
+          Just (ShortTag (Just "id") i) -> fromIntegral i
           _ -> case path [Nothing, Just "id"] nbt of
-             Just (ShortTag (Just "id") i) -> i
+             Just (ShortTag (Just "id") i) -> fromIntegral i
              _ -> error "item without id"
+             
+instance Show Item where
+  show (Item {itemCoords = (x, y, z), itemSource = source, itemData = nbt, itemId = id }) =
+    printf "item=%d[x=%d,y=%d,z=%d,source=%s]" 
+      id x y z (show source)
 {-   itemTags =
         concat $ mapMaybe (fmap (',' :) . showTag) $ 
           fromJust $ contents $ Just nbt
@@ -159,11 +160,15 @@ tryRest ps nbts =
   case mapMaybe (path ps) nbts of
     [nbt] -> Just nbt
     _ -> Nothing
+  
+filterItems tree item = 
+    case (findItemId tree) of
+        Just x  -> x == itemId item
+        Nothing -> False
 
 find :: Level -> Find -> [Item]
 find level tree =
-  findPlayers ++
-  findWorld
+  filter (filterItems tree) (findPlayers ++ findWorld)
   where
     findPlayers =
       concatMap findPlayer $ levelPlayers level
@@ -177,7 +182,8 @@ find level tree =
             itemize item = Item {
               itemCoords = playerCoords,
               itemSource = ItemSourcePlayer $ playerName player,
-              itemData = item }
+              itemData   = item,
+              itemId     = extractItemId item}
               where
                 playerCoords =
                   case path [Just "", Just "Pos"] $ 
@@ -216,7 +222,8 @@ find level tree =
                               Just $ Item {
                                 itemCoords = globalCoords,
                                 itemSource = ItemSourceFree dimName,
-                                itemData = ent }
+                                itemData   = ent,
+                                itemId     = extractItemId ent }
                               where
                                 globalCoords =
                                   case path [Nothing, Just "Pos"] ent of
