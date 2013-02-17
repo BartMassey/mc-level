@@ -24,7 +24,20 @@ they are easy to generate or edit.
 Sadly, having done the XML thing, I was unable to find any
 decent-performance XPath tool for Minecraft-level-sized XML
 databases. So I gave up, and am working on a finder that
-works directly with the NBT in the level structure.
+works directly with the NBT in the level structure. Examples
+of the planned finder syntax are:
+
+  * Find Diamond Pickaxes:
+
+        item=278
+
+  * Find Diamond Pickaxes with Productivity 2 or more:
+
+        item=278[ench=32[level>=2]]
+
+Yes, eventually I'll build in the symbolic names so that you
+don't have to go look them up at
+<http://www.minecraftwiki.net/wiki/Data_values>.
 
 To build this, first install
 <http://github.com/BartMassey/nbt>.  Then a simple "`cabal
