@@ -111,8 +111,8 @@ instance Show ItemSource where
 data Item = Item {
   itemCoords :: (Int, Int, Int),
   itemSource :: ItemSource,
-  itemData   :: NBT,
-  itemId     :: Int}
+  itemData :: NBT,
+  itemId :: Int}
 
 extractItemId nbt =
     case path [Nothing, Just "Item", Just "id"] nbt of
@@ -164,7 +164,7 @@ tryRest ps nbts =
 filterItems tree item = 
     case (findItemId tree) of
         Just x  -> x == itemId item
-        Nothing -> False
+        Nothing -> True
 
 find :: Level -> Find -> [Item]
 find level tree =
@@ -201,7 +201,7 @@ find level tree =
       let ds = [("surface", dimsSurface d), 
                 ("nether", dimsNether d), 
                 ("end", dimsEnd d)] in
-      let ws = [("free", "Entities")] in
+      let ws = [("free", "TileEntities")] in
       concatMap findDim $ (,) <$> ws <*> ds
       where
         findDim ((whichName, whichTag), (dimName, Just regions)) =
@@ -216,16 +216,7 @@ find level tree =
                     Just (ListTag (Just whichTag) _ _ nbts) ->
                       mapMaybe findItem nbts
                       where
-                        findItem ent =
-                          case path [Nothing, Just "Item"] ent of
-                            Just (CompoundTag (Just "Item") item) ->
-                              Just $ Item {
-                                itemCoords = globalCoords,
-                                itemSource = ItemSourceFree dimName,
-                                itemData   = ent,
-                                itemId     = extractItemId ent }
-                              where
-                                globalCoords =
+                        globalCoords ent =
                                   case path [Nothing, Just "Pos"] ent of
                                     Just (ListTag _  DoubleType _ [ 
                                              DoubleTag Nothing x, 
@@ -241,6 +232,24 @@ find level tree =
                                         mcc r c b =
                                           b + 16 * (c + 32 * r)
                                     _ -> error $ "entity has no position"
-                            _ -> Nothing
+                        findItem ent =
+                          case path [Just "TileEntities", Nothing, Just "Items"] ent of
+                            Just (ListTag _ _ num values) ->
+                                mapMaybe findChestItem values
+                              where
+                                findChestItem ent = 
+                                    Just $ Item {
+                                    itemCoords = globalCoords ent,
+                                    itemSource = ItemSourceTile dimName "",
+                                    itemData   = ent,
+                                    itemId     = extractItemId ent }
+                            _ -> case path [Nothing, Just "Item"] ent of
+                             Just (CompoundTag (Just "Item") item) ->
+                              Just $ Item {
+                                itemCoords = globalCoords ent,
+                                itemSource = ItemSourceFree dimName,
+                                itemData   = ent,
+                                itemId     = extractItemId ent }
+                             _ -> Nothing
                     _ -> []
         findDim _ = []
