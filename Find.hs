@@ -237,34 +237,29 @@ find level tree =
             findRegion region =
               concatMap findChunk $ regionContents region
               where
-                findChunk chunk = findEntities ++ findTileEntities
+                findChunk chunk = 
+                  findEntities "Entities" findItem ++ 
+                  findEntities "TileEntities" findTileItems
                   where
-                    findEntities = 
-                        case path [Just "", Just "Level", Just "Entities"] $ 
+                    findItem ent =
+                      case path [Nothing, Just "Item"] ent of
+                        Just (CompoundTag (Just "Item") _) ->
+                          Just $ Item {
+                            itemCoords = globalCoords ent region chunk ,
+                            itemSource = ItemSourceFree dimName,
+                            itemData   = ent,
+                            itemId     = extractItemId ent }
+                        _ -> Nothing
+                    findTileItems ent = 
+                      Just $ Item {
+                        itemCoords = globalCoords ent region chunk,
+                        itemSource = ItemSourceTile dimName "",
+                        itemData   = ent,
+                        itemId     = extractItemId ent }
+                    findEntities name extract = 
+                        case path [Just "", Just "Level", Just name] $ 
                              cdChunk chunk of
-                          Just (ListTag (Just _) _ _ nbts) ->
-                            (mapMaybe findItem nbts) -- ++ (concatMap findTileItem nbts)
-                            where
-                              findItem ent =
-                                case path [Nothing, Just "Item"] ent of
-                                  Just (CompoundTag (Just "Item") _) ->
-                                    Just $ Item {
-                                      itemCoords = globalCoords ent region chunk ,
-                                      itemSource = ItemSourceFree dimName,
-                                      itemData   = ent,
-                                      itemId     = extractItemId ent }
-                                  _ -> Nothing
+                          Just (ListTag (Just n) _ _ nbts) | name == n ->
+                            mapMaybe extract nbts
                           _ -> []
-                    findTileEntities = 
-                        case path [Just "", Just "Level", Just "TileEntities"] $ cdChunk chunk of
-                            Just (ListTag _ _ _ values) ->
-                                mapMaybe findTileItems values
-                              where
-                                findTileItems ent = 
-                                    Just $ Item {
-                                    itemCoords = (0,0,0), -- globalCoords ent region chunk,
-                                    itemSource = ItemSourceTile dimName "",
-                                    itemData   = ent,
-                                    itemId     = extractItemId ent }
-                            _ -> []
         findDim _ = []
