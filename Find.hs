@@ -114,6 +114,7 @@ data Item = Item {
   itemData :: NBT,
   itemId :: Int}
 
+extractItemId :: NBT -> Int
 extractItemId nbt =
     case path [Nothing, Just "Item", Just "id"] nbt of
           Just (ShortTag (Just "id") i) -> fromIntegral i
@@ -123,9 +124,9 @@ extractItemId nbt =
              _ -> error "item without id"
              
 instance Show Item where
-  show (Item {itemCoords = (x, y, z), itemSource = source, itemData = nbt, itemId = id }) =
+  show (Item {itemCoords = (x, y, z), itemSource = source, itemId = iId }) =
     printf "item=%d[x=%d,y=%d,z=%d,source=%s]" 
-      id x y z (show source)
+      iId x y z (show source)
 {-   itemTags =
         concat $ mapMaybe (fmap (',' :) . showTag) $ 
           fromJust $ contents $ Just nbt
@@ -162,6 +163,7 @@ tryRest ps nbts =
     [nbt] -> Just nbt
     _ -> Nothing
 
+globalCoords :: NBT -> Region -> ChunkData -> (Int, Int, Int)
 globalCoords ent region chunk =
     case path [Nothing, Just "Pos"] ent of
       Just (ListTag _  DoubleType _ [ 
@@ -185,6 +187,7 @@ globalCoords ent region chunk =
                 Just (IntTag _ intVal) -> fromIntegral intVal
                 _ -> 0
 
+filterItems :: Find -> Item -> Bool
 filterItems tree item = 
     case (findItemId tree) of
         Just x  -> x == itemId item
@@ -228,7 +231,7 @@ find level tree =
       let ws = [("free", "Entities")] in
       concatMap findDim $ (,) <$> ws <*> ds
       where
-        findDim ((whichName, whichTag), (dimName, Just regions)) =
+        findDim ((_, _), (dimName, Just regions)) =
           concatMap findRegion regions
           where
             findRegion region =
@@ -239,12 +242,12 @@ find level tree =
                     findEntities = 
                         case path [Just "", Just "Level", Just "Entities"] $ 
                              cdChunk chunk of
-                          Just (ListTag (Just whichTag) _ _ nbts) ->
+                          Just (ListTag (Just _) _ _ nbts) ->
                             (mapMaybe findItem nbts) -- ++ (concatMap findTileItem nbts)
                             where
                               findItem ent =
                                 case path [Nothing, Just "Item"] ent of
-                                  Just (CompoundTag (Just "Item") item) ->
+                                  Just (CompoundTag (Just "Item") _) ->
                                     Just $ Item {
                                       itemCoords = globalCoords ent region chunk ,
                                       itemSource = ItemSourceFree dimName,
@@ -253,8 +256,8 @@ find level tree =
                                   _ -> Nothing
                           _ -> []
                     findTileEntities = 
-                        case path [Just "", Just "Level",Just "TileEntities"] $ cdChunk chunk of
-                            Just (ListTag _ _ num values) ->
+                        case path [Just "", Just "Level", Just "TileEntities"] $ cdChunk chunk of
+                            Just (ListTag _ _ _ values) ->
                                 mapMaybe findTileItems values
                               where
                                 findTileItems ent = 
