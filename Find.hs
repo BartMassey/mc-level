@@ -114,14 +114,16 @@ data Item = Item {
   itemData :: NBT,
   itemId :: Int}
 
-extractItemId :: NBT -> Int
-extractItemId nbt =
-    case path [Nothing, Just "Item", Just "id"] nbt of
-          Just (ShortTag (Just "id") i) -> fromIntegral i
-          _ -> case path [Nothing, Just "id"] nbt of
-             Just (ShortTag (Just "id") i) -> fromIntegral i
-             Just (StringTag (Just "id") _ _) -> -1
-             _ -> error "item without id"
+
+extractItemId :: ItemSource -> NBT -> Int
+extractItemId source nbt =
+    case source of
+        ItemSourceFree _ -> findValue(path [Nothing, Just "Item", Just "id"] nbt)
+        ItemSourcePlayer _-> findValue(path [Nothing, Just "id"] nbt)
+        ItemSourceTile _ _-> findValue(path [Nothing, Just "id"] nbt)
+     where
+        findValue (Just (ShortTag (Just "id") i)) = fromIntegral i
+        findValue (Just (StringTag (Just "id") _ _)) = -1
              
 instance Show Item where
   show (Item {itemCoords = (x, y, z), itemSource = source, itemId = iId }) =
@@ -248,14 +250,14 @@ find level tree =
                             itemCoords = globalCoords ent region chunk ,
                             itemSource = ItemSourceFree dimName,
                             itemData   = ent,
-                            itemId     = extractItemId ent }
+                            itemId     = extractItemId (ItemSourceFree dimName) ent }
                         _ -> Nothing
                     findTileItems ent = 
                       Just $ Item {
                         itemCoords = globalCoords ent region chunk,
                         itemSource = ItemSourceTile dimName "",
                         itemData   = ent,
-                        itemId     = extractItemId ent }
+                        itemId     = extractItemId (ItemSourceTile dimName "") ent }
                     findEntities name extract = 
                         case path [Just "", Just "Level", Just name] $ 
                              cdChunk chunk of
