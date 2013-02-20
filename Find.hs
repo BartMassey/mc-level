@@ -111,7 +111,8 @@ instance Show ItemSource where
 data Item = Item {
   itemCoords :: (Int, Int, Int),
   itemSource :: ItemSource,
-  itemData :: NBT}
+  itemData :: NBT,
+  containedItems :: Maybe [Item]}
 
 extractItemId :: ItemSource -> NBT -> Int
 extractItemId source nbt =
@@ -123,7 +124,13 @@ extractItemId source nbt =
         findValue (Just (ShortTag (Just "id") i)) = fromIntegral i
         findValue (Just (StringTag (Just "id") _ _)) = -1
         findValue _ = error "item without id"
-        
+
+extractTileItemId :: NBT -> String
+extractTileItemId nbt =
+    case path [Nothing, Just "id"] nbt of
+        Just (StringTag (Just "id") _ tileId) -> tileId
+        _ -> ""
+    
 instance Show Item where
   show (Item {itemCoords = (x, y, z), itemSource = source, itemData = nbt}) =
     printf "item=%d[x=%d,y=%d,z=%d,source=%s]" 
@@ -210,7 +217,8 @@ find level tree =
             itemize item = Item {
               itemCoords = playerCoords,
               itemSource = ItemSourcePlayer $ playerName player,
-              itemData   = item}
+              itemData = item,
+              containedItems = Nothing}
               where
                 playerCoords =
                   case path [Just "", Just "Pos"] $ 
@@ -247,13 +255,29 @@ find level tree =
                           Just $ Item {
                             itemCoords = globalCoords ent region chunk ,
                             itemSource = ItemSourceFree dimName,
-                            itemData   = ent}
+                            itemData = ent,
+                            containedItems = Nothing}
                         _ -> Nothing
-                    findTileItems ent = 
-                      Just $ Item {
-                        itemCoords = globalCoords ent region chunk,
-                        itemSource = ItemSourceTile dimName "",
-                        itemData   = ent}
+                    findTileItems ent =
+                        Just $ Item {
+                            itemCoords = globalCoords ent region chunk ,
+                            itemSource = ItemSourceTile dimName (extractTileItemId ent),
+                            itemData = ent,
+                            containedItems = findInnerItems 
+                            }
+                        where
+                            findInnerItems =
+                                case path [Nothing, Just "Items"] ent of
+                                    Just (ListTag (Just "Items") _ _ inneritems) ->
+                                        Just (mapMaybe constructContainedItem inneritems)
+                                    _ -> Nothing
+                                where
+                                    constructContainedItem innerItem= 
+                                        Just $ Item {
+                                          itemCoords = globalCoords ent region chunk,
+                                          itemSource = ItemSourceTile dimName (extractTileItemId ent),
+                                          itemData = innerItem,
+                                          containedItems = Nothing}
                     findEntities name extract = 
                         case path [Just "", Just "Level", Just name] $ 
                              cdChunk chunk of
