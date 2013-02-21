@@ -99,14 +99,15 @@ makeTree expr =
 
 
 data ItemSource = ItemSourcePlayer {ispName :: String}
-                | ItemSourceTile {istDim :: String, istContainer :: String}
+                | ItemSourceTile {istDim :: String}
                 | ItemSourceFree {isfDim :: String}
+                | ItemSourceContained {isfDim :: String, istContainer :: String}
 
 instance Show ItemSource where
   show (ItemSourceFree dim) = "free[dim=" ++ dim ++ "]"
   show (ItemSourcePlayer name) = "player[" ++ name ++ "]"
-  show (ItemSourceTile dim container) = "tile[dim=" ++ dim ++ ",container=" ++ 
-                                          container ++ "]"
+  show (ItemSourceTile dim ) = "tile[dim=" ++ dim ++ "]"
+  show (ItemSourceContained _ container) = "inside[" ++ container ++ "]"
 
 data Item = Item {
   itemCoords :: (Int, Int, Int),
@@ -119,7 +120,8 @@ extractItemId source nbt =
     case source of
         ItemSourceFree _ -> findValue(path [Nothing, Just "Item", Just "id"] nbt)
         ItemSourcePlayer _-> findValue(path [Nothing, Just "id"] nbt)
-        ItemSourceTile _ _-> findValue(path [Nothing, Just "id"] nbt)
+        ItemSourceTile _ -> findValue(path [Nothing, Just "id"] nbt)
+        ItemSourceContained _ _ -> findValue(path [Nothing, Just "id"] nbt)
      where
         findValue (Just (ShortTag (Just "id") i)) = fromIntegral i
         findValue (Just (StringTag (Just "id") _ _)) = -1
@@ -132,9 +134,15 @@ extractTileItemId nbt =
         _ -> ""
     
 instance Show Item where
-  show (Item {itemCoords = (x, y, z), itemSource = source, itemData = nbt}) =
-    printf "item=%d[x=%d,y=%d,z=%d,source=%s]" 
-      (extractItemId source nbt) x y z (show source)
+  show (Item {itemCoords = (x, y, z), itemSource = source, itemData = nbt, containedItems = items}) =
+    if  isNothing items then
+       printf "item=%d[x=%d,y=%d,z=%d,source=%s]" 
+                                (extractItemId source nbt) x y z (show source)
+    else
+       printf "item=%d[x=%d,y=%d,z=%d,source=%s,containedItems=%s]" 
+                                (extractItemId source nbt) x y z (show source) (show items)
+        
+    
 {-   itemTags =
         concat $ mapMaybe (fmap (',' :) . showTag) $ 
           fromJust $ contents $ Just nbt
@@ -261,9 +269,9 @@ find level tree =
                     findTileItems ent =
                         Just $ Item {
                             itemCoords = globalCoords ent region chunk ,
-                            itemSource = ItemSourceTile dimName (extractTileItemId ent),
+                            itemSource = ItemSourceTile dimName,
                             itemData = ent,
-                            containedItems = findInnerItems 
+                            containedItems = findInnerItems
                             }
                         where
                             findInnerItems =
@@ -275,7 +283,7 @@ find level tree =
                                     constructContainedItem innerItem= 
                                         Just $ Item {
                                           itemCoords = globalCoords ent region chunk,
-                                          itemSource = ItemSourceTile dimName (extractTileItemId ent),
+                                          itemSource = ItemSourceContained dimName (extractTileItemId ent),
                                           itemData = innerItem,
                                           containedItems = Nothing}
                     findEntities name extract = 
