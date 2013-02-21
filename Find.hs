@@ -118,10 +118,8 @@ extractItemId :: ItemSource -> NBT -> Int
 extractItemId source nbt =
     case source of
         ItemSourceFree _ -> findValue(path [Nothing, Just "Item", Just "id"] nbt)
-        ItemSourcePlayer _-> findValue(path [Nothing, Just "id"] nbt)
-        ItemSourceTile _ -> findValue(path [Nothing, Just "id"] nbt)
-        ItemSourceContained _ -> findValue(path [Nothing, Just "id"] nbt)
-     where
+        _ -> findValue(path [Nothing, Just "id"] nbt)
+    where
         findValue (Just (ShortTag (Just "id") i)) = fromIntegral i
         findValue (Just (StringTag (Just "id") _ _)) = -1
         findValue _ = error "item without id"
@@ -147,17 +145,14 @@ extractContainedItems Item {itemCoords = (x, y, z), itemData = nbt} =
 
 instance Show Item where
   show (Item {itemCoords = (x, y, z), itemSource = source, itemData = nbt}) =
-    --if  isNothing items then
-    --   printf "item=%d[x=%d,y=%d,z=%d,source=%s]" 
-    --                            (extractItemId source nbt) x y z (show source)
-    --else
         let containedItems = extractContainedItems (Item (x,y,z) source nbt) in
         if isNothing containedItems then
             printf "item=%d[x=%d,y=%d,z=%d,source=%s]" 
                                 (extractItemId source nbt) x y z (show source)
         else
             printf "item=%d[x=%d,y=%d,z=%d,source=%s,\ncontainedItems=\n%s]" 
-                                (extractItemId source nbt) x y z (show source) (unlines (map (\i-> "  " ++ show i) (fromJust containedItems)))
+                                (extractItemId source nbt) x y z (show source)
+                                    (unlines (map (\i-> "  " ++ show i) (fromJust containedItems)))
         
     
 {-   itemTags =
