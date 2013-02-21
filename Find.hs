@@ -220,7 +220,7 @@ find level tree =
           case path [Just "", Just "Inventory"] $ 
                playerData player of
             Just (ListTag _ CompoundType _ items) -> map itemize items
-            _ -> error $ "player " ++ playerName player ++ " has no inventory"
+            _ -> []
           where
             itemize item = Item {
               itemCoords = playerCoords,
