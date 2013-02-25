@@ -130,15 +130,15 @@ extractTileItemId nbt =
         Just (StringTag (Just "id") _ tileId) -> tileId
         _ -> ""
 
-extractContainedItems :: Item -> Maybe [Item]
+extractContainedItems :: Item -> [Item]
 extractContainedItems Item {itemCoords = (x, y, z), itemData = nbt} = 
     case path [Nothing, Just "Items"] nbt of
         Just (ListTag (Just "Items") _ _ inneritems) ->
-            Just (mapMaybe constructContainedItem inneritems)
-        _ -> Nothing
+            (map constructContainedItem inneritems)
+        _ -> []
     where
         constructContainedItem innerItem= 
-            Just $ Item {
+            Item {
               itemCoords = (x,y,z),
               itemSource = ItemSourceContained (extractTileItemId nbt),
               itemData = innerItem}
@@ -146,13 +146,13 @@ extractContainedItems Item {itemCoords = (x, y, z), itemData = nbt} =
 instance Show Item where
   show (Item {itemCoords = (x, y, z), itemSource = source, itemData = nbt}) =
         let containedItems = extractContainedItems (Item (x,y,z) source nbt) in
-        if isNothing containedItems then
+        if null containedItems then
             printf "item=%d[x=%d,y=%d,z=%d,source=%s]" 
                                 (extractItemId source nbt) x y z (show source)
         else
             printf "item=%d[x=%d,y=%d,z=%d,source=%s,\ncontainedItems=\n%s]" 
                                 (extractItemId source nbt) x y z (show source)
-                                    (unlines (map (\i-> "  " ++ show i) (fromJust containedItems)))
+                                    (unlines (map (\i-> "  " ++ show i) (containedItems)))
         
     
 {-   itemTags =
@@ -216,9 +216,10 @@ globalCoords ent region chunk =
                 _ -> 0
 
 filterItems :: Find -> Item -> Bool
-filterItems tree (Item {itemSource = source, itemData = nbt})  = 
+filterItems tree (Item {itemSource = source, itemData = nbt, itemCoords = (x, y, z)})  = 
     case (findItemId tree) of
-        Just x  -> x == extractItemId source nbt
+        Just itemId -> (itemId == extractItemId source nbt) ||
+                       any  (filterItems tree) (extractContainedItems Item {itemSource = source, itemData = nbt, itemCoords = (x, y, z)})
         Nothing -> True
 
 find :: Level -> Find -> [Item]
