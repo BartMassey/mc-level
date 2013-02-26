@@ -114,6 +114,11 @@ data Item = Item {
   itemSource :: ItemSource,
   itemData :: NBT}
 
+data ItemEnchantment = ItemEnchantment {
+    enchantmentId :: Int,
+    enchantmentLevel :: Int
+} deriving Show
+
 extractItemId :: ItemSource -> NBT -> Int
 extractItemId source nbt =
     case source of
@@ -142,6 +147,20 @@ extractContainedItems Item {itemCoords = (x, y, z), itemData = nbt} =
               itemCoords = (x,y,z),
               itemSource = ItemSourceContained (extractTileItemId nbt),
               itemData = innerItem}
+
+extractEnchantments :: Item -> [ItemEnchantment]
+extractEnchantments Item {itemData = nbt} =
+    case path [Nothing, Just "Item", Just "tag", Just "ench"] nbt of
+        Just (ListTag (Just "ench") _ _ inneritems) ->
+            (map constructEnchantment inneritems)
+        _ -> []
+    where
+        constructEnchantment CompoundTag {compoundTag = [ShortTag {tagName = Just "id", shortTag = enchId},
+                                                         ShortTag {tagName = Just "lvl", shortTag = enchLvl}]} = 
+            ItemEnchantment {
+                enchantmentId = fromIntegral enchId,
+                enchantmentLevel = fromIntegral enchLvl
+            }
 
 instance Show Item where
   show (Item {itemCoords = (x, y, z), itemSource = source, itemData = nbt}) =
