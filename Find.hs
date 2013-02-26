@@ -252,33 +252,37 @@ filterById tree item  =
                        any  (filterById tree) (extractContainedItems item)
         Nothing -> True
 
-anyIfList :: (a -> Bool) -> [a] -> Bool
-anyIfList _ [] = True
-anyIfList f xs = any f xs
-
 filterByEnch :: Find -> Item -> Bool
 filterByEnch tree item =
-    anyIfList filterByEnchInner (extractEnchantments item)
-    where
-        filterByEnchInner ItemEnchantment {enchantmentId = itemEnchId, enchantmentLevel = itemEnchLvl} = 
-            anyIfList filterByQuals (findItemQuals tree)
+    let qualList = (findItemQuals tree) in
+    if null qualList then
+        True
+    else
+        if null (extractEnchantments item) then
+            any (filterByEnch tree) (extractContainedItems item)
+        else
+            all filterByEnchInner (extractEnchantments item) ||
+                any (filterByEnch tree) (extractContainedItems item)
             where
-                filterByQuals ItemQualEnch {itemQualEnchId = enchId, itemQualEnchAttrs = qualEnchAttrs} = 
-                    if enchId == itemEnchId &&
-                       anyIfList filterByEnchAttrs qualEnchAttrs then
-                        True
-                    else
-                        False
+                filterByEnchInner ItemEnchantment {enchantmentId = itemEnchId, enchantmentLevel = itemEnchLvl} = 
+                    all filterByQuals (findItemQuals tree)
                     where
-                        filterByEnchAttrs (ItemQualLevel rel) =
-                            if (rel itemEnchLvl) then
+                        filterByQuals ItemQualEnch {itemQualEnchId = enchId, itemQualEnchAttrs = qualEnchAttrs} = 
+                            if enchId == itemEnchId &&
+                               all filterByEnchAttrs qualEnchAttrs then
                                 True
                             else
                                 False
+                            where
+                                filterByEnchAttrs (ItemQualLevel rel) =
+                                    if (rel itemEnchLvl) then
+                                        True
+                                    else
+                                        False
         
 find :: Level -> Find -> [Item]
 find level tree =
-  filter (\x -> filterById tree x && filterByEnch tree x) (findPlayers ++ findWorld)
+  filter (\x -> (filterById tree x) && (filterByEnch tree x)) (findPlayers ++ findWorld)
   where
     findPlayers =
       concatMap findPlayer $ levelPlayers level
