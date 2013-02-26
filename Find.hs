@@ -158,25 +158,29 @@ extractEnchantments :: Item -> [ItemEnchantment]
 extractEnchantments Item {itemData = nbt} =
     case path [Nothing, Just "Item", Just "tag", Just "ench"] nbt of
         Just (ListTag (Just "ench") _ _ inneritems) ->
-            (map constructEnchantment inneritems)
-        _ -> []
+            (mapMaybe constructEnchantment inneritems)
+        _ -> case path [Nothing, Just "tag", Just "ench"] nbt of
+                Just (ListTag (Just "ench") _ _ inneritems) ->
+                    (mapMaybe constructEnchantment inneritems)
+                _ -> []
     where
         constructEnchantment CompoundTag {compoundTag = [ShortTag {tagName = Just "id", shortTag = enchId},
                                                          ShortTag {tagName = Just "lvl", shortTag = enchLvl}]} = 
-            ItemEnchantment {
+            Just ItemEnchantment {
                 enchantmentId = fromIntegral enchId,
                 enchantmentLevel = fromIntegral enchLvl
             }
+        constructEnchantment _ = Nothing
 
 instance Show Item where
   show item =
         let containedItems = extractContainedItems item in
         if null containedItems then
-            printf "item=%d[x=%d,y=%d,z=%d,source=%s]" 
-                                (extractItemId item) x y z (show (itemSource item))
+            printf "item=%d[x=%d,y=%d,z=%d,source=%s,enchantments=%s]" 
+                                (extractItemId item) x y z (show (itemSource item)) (show (extractEnchantments item))
         else
-            printf "item=%d[x=%d,y=%d,z=%d,source=%s,\ncontainedItems=\n%s]" 
-                                (extractItemId item) x y z (show (itemSource item))
+            printf "item=%d[x=%d,y=%d,z=%d,source=%s,enchantments=%s\ncontainedItems=\n%s]" 
+                                (extractItemId item) x y z (show (itemSource item)) (show (extractEnchantments item))
                                     (unlines (map (\i-> "  " ++ show i) (containedItems)))
         where
             (x,y,z) = (itemCoords item)
@@ -248,18 +252,29 @@ filterById tree item  =
                        any  (filterById tree) (extractContainedItems item)
         Nothing -> True
 
+anyIfList :: (a -> Bool) -> [a] -> Bool
+anyIfList _ [] = True
+anyIfList f xs = any f xs
+
 filterByEnch :: Find -> Item -> Bool
 filterByEnch tree item =
-    any filterByEnchInner (extractEnchantments item)
+    anyIfList filterByEnchInner (extractEnchantments item)
     where
         filterByEnchInner ItemEnchantment {enchantmentId = itemEnchId, enchantmentLevel = itemEnchLvl} = 
-            any filterByQuals (findItemQuals tree)
+            anyIfList filterByQuals (findItemQuals tree)
             where
                 filterByQuals ItemQualEnch {itemQualEnchId = enchId, itemQualEnchAttrs = qualEnchAttrs} = 
-                    if enchId == itemEnchId then
+                    if enchId == itemEnchId &&
+                       anyIfList filterByEnchAttrs qualEnchAttrs then
                         True
                     else
                         False
+                    where
+                        filterByEnchAttrs (ItemQualLevel rel) =
+                            if (rel itemEnchLvl) then
+                                True
+                            else
+                                False
         
 find :: Level -> Find -> [Item]
 find level tree =
