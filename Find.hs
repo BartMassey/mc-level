@@ -119,16 +119,22 @@ data ItemEnchantment = ItemEnchantment {
     enchantmentLevel :: Int
 } deriving Show
 
-extractItemId :: ItemSource -> NBT -> Int
-extractItemId source nbt =
-    case source of
-        ItemSourceFree _ -> findValue(path [Nothing, Just "Item", Just "id"] nbt)
-        _ -> findValue(path [Nothing, Just "id"] nbt)
-    where
-        findValue (Just (ShortTag (Just "id") i)) = fromIntegral i
-        findValue (Just (StringTag (Just "id") _ _)) = -1
-        findValue _ = error "item without id"
 
+
+extractItemId :: Item -> Int
+extractItemId item =
+    extractItemIdInner (itemSource item) (itemData item)
+    where
+        extractItemIdInner :: ItemSource -> NBT -> Int
+        extractItemIdInner source nbt =
+            case source of
+                ItemSourceFree _ -> findValue(path [Nothing, Just "Item", Just "id"] nbt)
+                _ -> findValue(path [Nothing, Just "id"] nbt)
+            where
+                findValue (Just (ShortTag (Just "id") i)) = fromIntegral i
+                findValue (Just (StringTag (Just "id") _ _)) = -1
+                findValue _ = error "item without id"
+            
 extractTileItemId :: NBT -> String
 extractTileItemId nbt =
     case path [Nothing, Just "id"] nbt of
@@ -163,16 +169,17 @@ extractEnchantments Item {itemData = nbt} =
             }
 
 instance Show Item where
-  show (Item {itemCoords = (x, y, z), itemSource = source, itemData = nbt}) =
-        let containedItems = extractContainedItems (Item (x,y,z) source nbt) in
+  show item =
+        let containedItems = extractContainedItems item in
         if null containedItems then
             printf "item=%d[x=%d,y=%d,z=%d,source=%s]" 
-                                (extractItemId source nbt) x y z (show source)
+                                (extractItemId item) x y z (show (itemSource item))
         else
             printf "item=%d[x=%d,y=%d,z=%d,source=%s,\ncontainedItems=\n%s]" 
-                                (extractItemId source nbt) x y z (show source)
+                                (extractItemId item) x y z (show (itemSource item))
                                     (unlines (map (\i-> "  " ++ show i) (containedItems)))
-        
+        where
+            (x,y,z) = (itemCoords item)
     
 {-   itemTags =
         concat $ mapMaybe (fmap (',' :) . showTag) $ 
@@ -234,16 +241,29 @@ globalCoords ent region chunk =
                 Just (IntTag _ intVal) -> fromIntegral intVal
                 _ -> 0
 
-filterItems :: Find -> Item -> Bool
-filterItems tree (Item {itemSource = source, itemData = nbt, itemCoords = (x, y, z)})  = 
+filterById :: Find -> Item -> Bool
+filterById tree item  = 
     case (findItemId tree) of
-        Just itemId -> (itemId == extractItemId source nbt) ||
-                       any  (filterItems tree) (extractContainedItems Item {itemSource = source, itemData = nbt, itemCoords = (x, y, z)})
+        Just itemId -> (itemId == extractItemId item) ||
+                       any  (filterById tree) (extractContainedItems item)
         Nothing -> True
 
+filterByEnch :: Find -> Item -> Bool
+filterByEnch tree item =
+    any filterByEnchInner (extractEnchantments item)
+    where
+        filterByEnchInner ItemEnchantment {enchantmentId = itemEnchId, enchantmentLevel = itemEnchLvl} = 
+            any filterByQuals (findItemQuals tree)
+            where
+                filterByQuals ItemQualEnch {itemQualEnchId = enchId, itemQualEnchAttrs = qualEnchAttrs} = 
+                    if enchId == itemEnchId then
+                        True
+                    else
+                        False
+        
 find :: Level -> Find -> [Item]
 find level tree =
-  filter (filterItems tree) (findPlayers ++ findWorld)
+  filter (\x -> filterById tree x && filterByEnch tree x) (findPlayers ++ findWorld)
   where
     findPlayers =
       concatMap findPlayer $ levelPlayers level
