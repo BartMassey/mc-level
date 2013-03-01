@@ -11,9 +11,11 @@ import Control.Applicative ((<$>), (<*>))
 import Data.Maybe
 import Data.NBT
 import Game.Minecraft.Level
+import Game.Minecraft.Identifiers
 import Text.Parsec.Prim
 import Text.ParserCombinators.Parsec
 import Text.Printf
+import GHC.Int
 
 type Rel = Int -> Bool
     
@@ -120,21 +122,24 @@ data ItemEnchantment = ItemEnchantment {
 } deriving Show
 
 
-
+extractItemDescription :: Item -> String
+extractItemDescription item =
+    extractItemIdWithResult (itemSource item) (itemData item) (\x-> idToName (fromIntegral x)) (\x->x)
+    
 extractItemId :: Item -> Int
 extractItemId item =
-    extractItemIdInner (itemSource item) (itemData item)
+    extractItemIdWithResult (itemSource item) (itemData item) fromIntegral (\_-> -1)
+
+extractItemIdWithResult :: ItemSource -> NBT -> (GHC.Int.Int16 -> t) -> (String -> t) -> t
+extractItemIdWithResult source nbt valueFunc stringFunc =
+    case source of
+        ItemSourceFree _ -> findValue(path [Nothing, Just "Item", Just "id"] nbt)
+        _ -> findValue(path [Nothing, Just "id"] nbt)
     where
-        extractItemIdInner :: ItemSource -> NBT -> Int
-        extractItemIdInner source nbt =
-            case source of
-                ItemSourceFree _ -> findValue(path [Nothing, Just "Item", Just "id"] nbt)
-                _ -> findValue(path [Nothing, Just "id"] nbt)
-            where
-                findValue (Just (ShortTag (Just "id") i)) = fromIntegral i
-                findValue (Just (StringTag (Just "id") _ _)) = -1
-                findValue _ = error "item without id"
-            
+        findValue (Just (ShortTag (Just "id") i)) = valueFunc i
+        findValue (Just (StringTag (Just "id") _ z)) = stringFunc z
+        findValue _ = error "item without id"
+
 extractTileItemId :: NBT -> String
 extractTileItemId nbt =
     case path [Nothing, Just "id"] nbt of
@@ -176,11 +181,11 @@ instance Show Item where
   show item =
         let containedItems = extractContainedItems item in
         if null containedItems then
-            printf "item=%d[x=%d,y=%d,z=%d,source=%s,enchantments=%s]" 
-                                (extractItemId item) x y z (show (itemSource item)) (show (extractEnchantments item))
+            printf "item=%s[x=%d,y=%d,z=%d,source=%s,enchantments=%s]" 
+                                (extractItemDescription item) x y z (show (itemSource item)) (show (extractEnchantments item))
         else
-            printf "item=%d[x=%d,y=%d,z=%d,source=%s,enchantments=%s\ncontainedItems=\n%s]" 
-                                (extractItemId item) x y z (show (itemSource item)) (show (extractEnchantments item))
+            printf "item=%s[x=%d,y=%d,z=%d,source=%s,enchantments=%s\ncontainedItems=\n%s]" 
+                                (extractItemDescription item) x y z (show (itemSource item)) (show (extractEnchantments item))
                                     (unlines (map (\i-> "  " ++ show i) (containedItems)))
         where
             (x,y,z) = (itemCoords item)
