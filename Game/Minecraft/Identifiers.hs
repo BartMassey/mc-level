@@ -1,15 +1,15 @@
 module Game.Minecraft.Identifiers (
-  idToName,
-  nameToId )
+  itemIdToName,
+  nameToItemId )
 where
 
 type ItemList = [(Int, String)]
 
-idToName :: Int -> String
-idToName itemId = searchDataById itemId minecraftData
+itemIdToName :: Int -> String
+itemIdToName itemId = searchDataById itemId minecraftData
 
-nameToId :: String -> Int
-nameToId itemName = searchDataByName itemName minecraftData
+nameToItemId :: String -> Int
+nameToItemId itemName = searchDataByName itemName minecraftData
 
 searchDataById :: Int -> ItemList -> String
 searchDataById _ [] = ""

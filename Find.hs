@@ -124,7 +124,7 @@ data ItemEnchantment = ItemEnchantment {
 
 extractItemDescription :: Item -> String
 extractItemDescription item =
-    extractItemIdWithResult (itemSource item) (itemData item) (\x-> idToName (fromIntegral x)) (\x->x)
+    extractItemIdWithResult (itemSource item) (itemData item) (\x-> itemIdToName (fromIntegral x)) (\x->x)
     
 extractItemId :: Item -> Int
 extractItemId item =
@@ -180,12 +180,19 @@ extractEnchantments Item {itemData = nbt} =
 instance Show Item where
   show item =
         let containedItems = extractContainedItems item in
-        if null containedItems then
-            printf "item=%s[x=%d,y=%d,z=%d,source=%s,enchantments=%s]" 
-                                (extractItemDescription item) x y z (show (itemSource item)) (show (extractEnchantments item))
+        if null containedItems && null (extractEnchantments item) then
+            printf "%s (ID:%d)[x=%d,y=%d,z=%d,source=%s]" 
+                                (extractItemDescription item) (extractItemId item) x y z (show (itemSource item))
+        else if null containedItems then
+            printf "%s (ID:%d)[x=%d,y=%d,z=%d,source=%s,enchantments=%s]" 
+                                (extractItemDescription item) (extractItemId item) x y z (show (itemSource item)) (show (extractEnchantments item))
+        else if null (extractEnchantments item) then
+            printf "%s (ID:%d)[x=%d,y=%d,z=%d,source=%s\ncontainedItems=\n%s]" 
+                                (extractItemDescription item) (extractItemId item) x y z (show (itemSource item))  
+                                    (unlines (map (\i-> "  " ++ show i) (containedItems)))
         else
-            printf "item=%s[x=%d,y=%d,z=%d,source=%s,enchantments=%s\ncontainedItems=\n%s]" 
-                                (extractItemDescription item) x y z (show (itemSource item)) (show (extractEnchantments item))
+            printf "%s (ID:%d)[x=%d,y=%d,z=%d,source=%s,enchantments=%s\ncontainedItems=\n%s]" 
+                                (extractItemDescription item) (extractItemId item) x y z (show (itemSource item)) (show (extractEnchantments item))
                                     (unlines (map (\i-> "  " ++ show i) (containedItems)))
         where
             (x,y,z) = (itemCoords item)
