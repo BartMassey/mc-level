@@ -1,6 +1,8 @@
 module Game.Minecraft.Identifiers (
   itemIdToName,
-  nameToItemId )
+  nameToItemId,
+  enchIdToName,
+  enchNameToId)
 where
 
 type ItemList = [(Int, String)]
@@ -10,6 +12,12 @@ itemIdToName itemId = searchDataById itemId minecraftData
 
 nameToItemId :: String -> Int
 nameToItemId itemName = searchDataByName itemName minecraftData
+
+enchIdToName :: Int -> String
+enchIdToName enchId = searchDataById enchId enchantmentData
+
+enchNameToId :: String -> Int
+enchNameToId enchName = searchDataByName enchName enchantmentData
 
 searchDataById :: Int -> ItemList -> String
 searchDataById _ [] = ""
@@ -348,4 +356,30 @@ minecraftData = [
         (2264,"strad Disc"),
         (2265,"ward Disc"),
         (2266,"wait Disc")
+    ]
+    
+enchantmentData :: ItemList
+enchantmentData = [
+        (0, "Protection"),
+        (1, "Fire Protection"),
+        (2, "Feather Falling"),
+        (3, "Blast Protection"),
+        (4, "Projectile Protection"),
+        (5, "Respiration"),
+        (6, "Aqua Affinity"),
+        (7, "Thorns"),
+        (16, "Sharpness"),
+        (17, "Smite"),
+        (18, "Bane of Arthropods"),
+        (19, "Knockback"),
+        (20, "Fire Aspect"),
+        (21, "Looting Swords"),
+        (32, "Efficiency"),
+        (33, "Silk Touch"),
+        (34, "Unbreaking"),
+        (35, "Fortune"),
+        (48, "Power"),
+        (49, "Punch"),
+        (50, "Flame"),
+        (51, "Infinity")
     ]
